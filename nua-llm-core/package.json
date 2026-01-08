@@ -1,0 +1,19 @@
+{
+  "name": "nua-llm-core",
+  "version": "1.0.0",
+  "description": "Nua LLM Core Library",
+  "packageManager": "pnpm@10.20.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2",
+    "@types/node": "^24.5.2"
+  }
+}

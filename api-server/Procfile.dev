@@ -1,0 +1,9 @@
+## NOTE: The order of process is important. Hivemind adds 10 to the starting PORT env variable per process
+
+# Sleep to allow the build to complete. graphile-worker also runs .js files
+web: sleep 8 && dotenvx run --env-file ./src/.env -- node --watch --watch-preserve-output dist/index.js
+
+build-all: tsc -w
+
+# Watch the dist folder because any code change should restart the graphile worker so it can reload the worker code
+job-server: sleep 4 && dotenvx run --env-file ./src/.env -- node --watch-path=./dist --watch-preserve-output ./node_modules/graphile-worker/dist/cli.js -C dist/graphile.config.js

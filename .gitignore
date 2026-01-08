@@ -1,0 +1,44 @@
+# Node.js
+node_modules/
+dist/
+build/
+.npm
+.eslintcache
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+*.env
+# we want to keep mise.toml.example
+mise.toml
+mise.*.toml
+
+
+# IDEs and LLM Agents
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+.claude/
+.cursor/
+.aider*
+.continue/
+.codeium/
+settings.local.json
+*.local.json
+
+# Temporary files
+/Users/jasim/.gemini/tmp/
+
+# bv (beads viewer) local config and caches
+.bv/

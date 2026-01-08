@@ -1,0 +1,3 @@
+web: node dist/index.js
+jobserver: node_modules/.bin/graphile-worker -C dist/graphile.config.js
+

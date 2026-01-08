@@ -1,0 +1,53 @@
+{
+  "compilerOptions": {
+    "target": "es2021",
+    "module": "commonjs",
+    "lib": [
+      "ES2021"
+    ],
+    "moduleDetection": "force", // this and the next option to prevent any .ts file from
+    "isolatedModules": true, // compiling if it doesn't have any exports
+    // that is because -- TS treats any file without any exports as a global module! And so we wont
+    // have compile errors if we refer to some value from these files without importing it, and will
+    // crash at runtime
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "baseUrl": ".",
+    "paths": {
+      "#bg-tasks/*": [
+        "./src/bg-tasks/*"
+      ],
+      "#handlers/*": [
+        "./src/handlers/*"
+      ],
+      "#lib/*": [
+        "./src/lib/*"
+      ],
+      "#llm_authorization/*": [
+        "./src/llm_authorization/*"
+      ],
+      "#middleware/*": [
+        "./src/middleware/*"
+      ],
+      "#modules/*": [
+        "./src/modules/*"
+      ],
+      "#types/*": [
+        "./src/types/*"
+      ]
+    }
+  },
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "**/*.spec.ts"
+  ]
+}
