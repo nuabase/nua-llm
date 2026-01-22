@@ -27,7 +27,8 @@ USER ${APP_USER_NAME}
 WORKDIR $APP_HOME
 
 # Copy root and package files for dependency installation
-COPY --chown=${APP_USER_NAME}:${APP_USER_NAME} pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+# .npmrc must be copied before pnpm install for inject-workspace-packages to work
+COPY --chown=${APP_USER_NAME}:${APP_USER_NAME} .npmrc pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY --chown=${APP_USER_NAME}:${APP_USER_NAME} api-server/package.json ./api-server/
 COPY --chown=${APP_USER_NAME}:${APP_USER_NAME} nua-llm-core/package.json ./nua-llm-core/
 COPY --chown=${APP_USER_NAME}:${APP_USER_NAME} nua-llm-caching/package.json ./nua-llm-caching/
@@ -44,7 +45,10 @@ COPY --chown=${APP_USER_NAME}:${APP_USER_NAME} . .
 RUN pnpm -r run build
 
 # Use pnpm deploy to extract the api-server into a standalone production directory
-# This will include only production dependencies and handle workspace links
+# This creates a self-contained copy with only production dependencies.
+#
+# IMPORTANT: This requires `inject-workspace-packages=true` in .npmrc (see that file for details).
+# Without it, workspace deps (nua-llm-core, nua-llm-caching) would be symlinks that break on copy.
 RUN pnpm --filter api deploy /app/prod-api --prod
 
 # Final stage for app image
