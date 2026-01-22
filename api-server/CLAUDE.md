@@ -20,11 +20,4 @@ Server runs at `http://localhost:3030`. Environment loaded from `src/.env` via d
 
 ## Testing
 
-```bash
-cd hurl
-hurl --very-verbose --variables-file vars.env cast_value/simple_now.hurl
-```
-
-Run these tets for *ever* .hurl file recursively in the `hurl` directory.
-
-The `vars.env` file contains the API token for authentication.
+See [TESTING.md](TESTING.md)

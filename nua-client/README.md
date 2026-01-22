@@ -249,6 +249,10 @@ Submits an async job for array operations. Returns `{ success: true, jobId }`.
 
 Email us at [hello@nuabase.com](mailto:hello@nuabase.com). On X at [@NuabaseHQ](x.com/NuabaseHQ).
 
+## Tests
+
+See [TESTING.md](TESTING.md)
+
 ## Credits
 
 The template for this package comes from https://github.com/rtivital/ts-package-template

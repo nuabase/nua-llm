@@ -1,6 +1,3 @@
-# Running tests
+# Development
 
-```
-npx prettier **/*.ts --write && MISE_ENV=development mise exec -- npm run test
-MISE_ENV=production mise exec -- npm run test
- ```
+See [TESTING.md](TESTING.md) for running tests.
