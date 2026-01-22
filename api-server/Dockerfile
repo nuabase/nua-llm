@@ -1,9 +1,12 @@
-# syntax=docker/dockerfile:1
+# syntax=docker/dockerfile:1.4
 # check=error=true
-
+#
 # This Dockerfile is designed for production, not development.
 # Run this from the MONOREPO ROOT:
 # docker build -f api-server/Dockerfile -t nua-llm-api .
+#
+# NOTE: Uses BuildKit features (cache mounts). Requires DOCKER_BUILDKIT=1 if not default.
+# Dokku should have BuildKit enabled - see ansible/roles/dokku-applications/tasks/configure_builder.yml
 
 FROM node:23-slim AS base
 
@@ -35,7 +38,11 @@ COPY --chown=${APP_USER_NAME}:${APP_USER_NAME} nua-llm-caching/package.json ./nu
 COPY --chown=${APP_USER_NAME}:${APP_USER_NAME} nua-client/package.json ./nua-client/
 
 # Install dependencies for all packages
-RUN pnpm install --frozen-lockfile
+# BuildKit cache mount persists the pnpm store across builds for faster installs.
+# Using uid/gid=1000 since we run as non-root 'node' user.
+# The 'id' allows sharing this cache across multiple apps on the same Dokku host.
+RUN --mount=type=cache,id=pnpm-store,target=/home/node/.local/share/pnpm/store/v3,uid=1000,gid=1000 \
+    pnpm install --frozen-lockfile
 
 # Copy application code for all packages
 COPY --chown=${APP_USER_NAME}:${APP_USER_NAME} . .
