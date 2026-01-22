@@ -1,13 +1,3 @@
-/** Returns a shallow clone of headers with sensitive values redacted. */
-export function sanitizeHeaders(headers: Record<string, any> | undefined) {
-  if (!headers) return {};
-  const cloned: Record<string, any> = { ...headers };
-  if (cloned.authorization) {
-    cloned.authorization = "Bearer [REDACTED]";
-  }
-  return cloned;
-}
-
 // A helper to safely extract an error message from a caught exception.
 function getErrorMessageFromException(error: unknown): string {
   if (error instanceof Error) {

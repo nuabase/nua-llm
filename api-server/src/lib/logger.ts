@@ -1,5 +1,10 @@
 import winston from "winston";
-import { randomUUID } from "crypto";
+import {
+  generateSpanId,
+  truncateText,
+  pickHeaders,
+  normalizeError,
+} from "nua-llm-core";
 
 // Pretty format for development
 function formatValue(value: any, indent = 0) {
@@ -100,20 +105,61 @@ const logger = winston.createLogger({
   transports,
 });
 
-export const generateSpanId = (): string => randomUUID();
+export { generateSpanId };
+
+// Typed interfaces for API logging
+interface ApiRequestLog {
+  url: string;
+  method: string;
+  headers: Record<string, string | string[] | undefined>;
+  userAgent?: string;
+  ip?: string;
+  body?: unknown;
+}
+
+interface ApiResponseLog {
+  status: number;
+}
+
+// Header allowlist for API requests - only log headers useful for debugging
+const API_REQUEST_HEADER_ALLOWLIST = new Set([
+  "content-type",
+  "content-length",
+  "accept",
+  "origin",
+  "referer",
+  "host",
+  "x-request-id",
+  "x-correlation-id",
+]);
+
+// Headers to log with redacted values (presence is useful, value is sensitive)
+const REDACTED_HEADERS = new Set(["authorization"]);
+
+function truncateBody(body: unknown): { bodyPreview?: string; bodyLength?: number } {
+  if (body === null || body === undefined) return {};
+  const text = typeof body === "string" ? body : JSON.stringify(body);
+  const { preview, length } = truncateText(text);
+  return { bodyPreview: preview, bodyLength: length };
+}
 
 export const logApiCallStart = (
   spanId: string,
   service: string,
   method: string,
-  fullRequest: any,
+  request: ApiRequestLog,
 ) => {
+  const { body, headers, ...rest } = request;
   logger.info("API call started", {
     type: "api_call_start",
     span_id: spanId,
     service,
     method,
-    request: fullRequest,
+    request: {
+      ...rest,
+      headers: pickHeaders(headers, API_REQUEST_HEADER_ALLOWLIST, REDACTED_HEADERS),
+      ...truncateBody(body),
+    },
   });
 };
 
@@ -121,7 +167,7 @@ export const logApiCallComplete = (
   spanId: string,
   service: string,
   method: string,
-  fullResponse: any,
+  response: ApiResponseLog,
   duration: number,
 ) => {
   logger.info("API call completed", {
@@ -129,7 +175,7 @@ export const logApiCallComplete = (
     span_id: spanId,
     service,
     method,
-    response: fullResponse,
+    response,
     duration_ms: duration,
   });
 };
@@ -138,7 +184,7 @@ export const logApiCallError = (
   spanId: string,
   service: string,
   method: string,
-  error: any,
+  error: unknown,
   duration: number,
 ) => {
   logger.error("API call failed", {
@@ -146,10 +192,7 @@ export const logApiCallError = (
     span_id: spanId,
     service,
     method,
-    error:
-      error instanceof Error
-        ? { message: error.message, stack: error.stack }
-        : String(error),
+    error: normalizeError(error),
     duration_ms: duration,
   });
 };

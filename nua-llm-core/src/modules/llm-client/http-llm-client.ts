@@ -1,9 +1,9 @@
 import { CanonicalModelName, SUPPORTED_MODELS } from "../model-info";
 import {
   generateSpanId,
-  logApiCallComplete,
-  logApiCallError,
-  logApiCallStart,
+  logLlmCallComplete,
+  logLlmCallError,
+  logLlmCallStart,
   Logger,
 } from "../../lib/logger";
 import { LlmClient } from "./llm-client";
@@ -71,19 +71,16 @@ export class HttpLlmClient implements LlmClient {
     const spanId = generateSpanId();
     const startTime = Date.now();
 
-    logApiCallStart(
+    logLlmCallStart(
       this.logger,
       spanId,
       provider.providerId,
       provider.apiOperation,
       {
         url: requestOptions.loggableUrl ?? requestOptions.url,
-        method,
-        headers: requestOptions.loggableHeaders ?? headers,
-        body: requestOptions.loggableBody ?? bodyPayload,
-        model: model,
-        maxTokens: maxTokens,
-        assistantPrefillPrompt,
+        httpMethod: method,
+        model,
+        maxTokens,
       },
     );
 
@@ -98,16 +95,15 @@ export class HttpLlmClient implements LlmClient {
         await provider.parseResponse(response);
       const duration = Date.now() - startTime;
 
-      logApiCallComplete(
+      logLlmCallComplete(
         this.logger,
         spanId,
         provider.providerId,
         provider.apiOperation,
         {
           status: response.status,
+          responseText: parsedResponse.text,
           headers: Object.fromEntries(response.headers.entries()),
-          body: parsedResponse.text,
-          responseLength: parsedResponse.text.length,
           usage: parsedResponse.usage,
         },
         duration,
@@ -117,7 +113,7 @@ export class HttpLlmClient implements LlmClient {
     } catch (error) {
       const duration = Date.now() - startTime;
 
-      logApiCallError(
+      logLlmCallError(
         this.logger,
         spanId,
         provider.providerId,

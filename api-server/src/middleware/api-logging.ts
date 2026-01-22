@@ -1,6 +1,5 @@
 import { Request, Response } from "express";
 import { logApiCallStart, logApiCallComplete } from "../lib/logger";
-import { sanitizeHeaders } from "../lib/http-utils";
 
 /**
  * Logs API call start and completion using request-scoped context.
@@ -14,23 +13,20 @@ export function apiLogging(service: string) {
       (req.route?.path as string | undefined) ||
       req.path;
 
-    // Start log with sanitized request data
+    // Start log with essential request metadata
     logApiCallStart(spanId, service, routeLabel, {
       url: req.url,
       method: req.method,
-      headers: sanitizeHeaders(req.headers as any),
-      body: req.body,
+      headers: req.headers,
       userAgent: req.headers["user-agent"],
       ip: req.ip,
+      body: req.body,
     });
 
     // Completion log on finish
     res.on("finish", () => {
       const duration = req.ctx?.elapsedMs ? req.ctx.elapsedMs() : 0;
-      const responseMeta: any = {
-        status: res.statusCode,
-      };
-      logApiCallComplete(spanId, service, routeLabel, responseMeta, duration);
+      logApiCallComplete(spanId, service, routeLabel, { status: res.statusCode }, duration);
     });
 
     next();
