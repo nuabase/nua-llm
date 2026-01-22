@@ -1,4 +1,4 @@
-import { extractJsonFromMarkdown } from '../modules/execution/call-llm-service';
+import { extractJsonFromMarkdown } from '../modules/execution/llm-response-extraction';
 
 describe('extractJsonFromMarkdown', () => {
   test('removes regular code fences with content on a new line', () => {

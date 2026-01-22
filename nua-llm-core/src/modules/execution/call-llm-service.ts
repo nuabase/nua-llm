@@ -2,61 +2,14 @@ import { ValidationResult } from "../json-schema-validation/nua-json-schema-valu
 import { LlmClient } from "../llm-client/llm-client";
 import { NormalizedUsage } from "../llm-client/provider-config";
 import { CanonicalModelName } from "../model-info";
+import {
+  extractJsonFromMarkdown,
+  extractThinkingFromResponse,
+} from "./llm-response-extraction";
 
 const delay = (ms: number): Promise<void> => {
   return new Promise((resolve) => setTimeout(resolve, ms));
 };
-
-export function extractThinkingFromResponse(input: string): {
-  thinking: string;
-  cleanedResponse: string;
-} {
-  const thinkRegex = /<think>(.*?)<\/think>/gis;
-  const thinkingParts: string[] = [];
-  let match;
-
-  while ((match = thinkRegex.exec(input)) !== null) {
-    thinkingParts.push(match[1].trim());
-  }
-
-  const thinking = thinkingParts.join("\n\n");
-  const cleanedResponse = input.replace(/<think>.*?<\/think>/gis, "").trim();
-
-  return {
-    thinking,
-    cleanedResponse,
-  };
-}
-
-export function extractJsonFromMarkdown(input: string): string {
-  // normalize input so we can detect a fenced code block at the edges.
-  const trimmed = input.trim();
-  const codeFence = "```";
-  const jsonFence = "```json";
-
-  // extract content when the block is explicitly labeled as JSON.
-  if (trimmed.startsWith(jsonFence)) {
-    const startIndex = jsonFence.length;
-    const endIndex = trimmed.lastIndexOf(codeFence);
-
-    if (endIndex > startIndex) {
-      return trimmed.substring(startIndex, endIndex).trim();
-    }
-  }
-
-  // extract content when the block is fenced without a language tag.
-  if (trimmed.startsWith(codeFence) && !trimmed.startsWith(jsonFence)) {
-    const startIndex = codeFence.length;
-    const endIndex = trimmed.lastIndexOf(codeFence);
-
-    if (endIndex > startIndex) {
-      return trimmed.substring(startIndex, endIndex).trim();
-    }
-  }
-
-  // return the original input when no relevant fence is present.
-  return input;
-}
 
 export type CallLlmResult = {
   data: object;
