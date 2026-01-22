@@ -31,7 +31,7 @@ COPY --chown=${APP_USER_NAME}:${APP_USER_NAME} pnpm-lock.yaml pnpm-workspace.yam
 COPY --chown=${APP_USER_NAME}:${APP_USER_NAME} api-server/package.json ./api-server/
 COPY --chown=${APP_USER_NAME}:${APP_USER_NAME} nua-llm-core/package.json ./nua-llm-core/
 COPY --chown=${APP_USER_NAME}:${APP_USER_NAME} nua-llm-caching/package.json ./nua-llm-caching/
-COPY --chown=${APP_USER_NAME}:${APP_USER_NAME} client/package.json ./client/
+COPY --chown=${APP_USER_NAME}:${APP_USER_NAME} nua-client/package.json ./nua-client/
 
 # Install dependencies for all packages
 RUN pnpm install --frozen-lockfile
