@@ -44,8 +44,5 @@ export { estimateRowTokens, estimateRowTokensByPk } from "./estimate-row-tokens"
 
 // Schema utilities
 export {
-  wrapArraySchema,
-  unwrapArraySchema,
   arrayOutputToLookup,
-  type ArraySchemaOptions,
 } from "./schema";

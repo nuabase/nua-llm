@@ -12,3 +12,4 @@ export type { LlmProviderId } from "./modules/llm-client/provider-config";
 export { validateJsonSchema } from "./modules/json-schema-validation/validate-json-schema";
 export { stableStringify } from "./lib/stable-stringify";
 export * from "./modules/model-info";
+export * from "./lib/schema-utils";

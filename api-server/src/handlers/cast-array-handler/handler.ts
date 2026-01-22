@@ -6,7 +6,7 @@ import {
 import { validateCastArrayRequestParams } from "#handlers/cast-array-handler/validate-cast-array-request";
 import { sendUnauthorized_unlessUser } from "#handlers/user-request-gating";
 import { workerUtils } from "#lib/graphile-worker-utils";
-import { wrapArraySchema } from "nua-llm-caching";
+import { wrapArraySchema } from "nua-llm-core";
 import { isNuaValidationError, NuaValidationError } from "nua-llm-core";
 import executeLlmRequest from "#modules/execute-llm-request/execute-llm-request";
 import { validateJsonSchema } from "nua-llm-core";

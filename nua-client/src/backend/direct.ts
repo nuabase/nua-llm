@@ -1,5 +1,5 @@
 import { CastArrayParams, CastResult, CastValueParams, LlmBackend, NormalizedUsage } from './types';
-import { LlmProviderId, NuaLlmClient } from 'nua-llm-core';
+import { LlmProviderId, NuaLlmClient, wrapArraySchema } from 'nua-llm-core';
 
 export type DirectConfig = {
   model: string;
@@ -57,11 +57,15 @@ export class DirectBackend implements LlmBackend {
 
   async castArray<T>(params: CastArrayParams): Promise<CastResult<T[]>> {
     const startTime = Date.now();
+    const wrappedSchema = wrapArraySchema(params.outputSchema as Record<string, unknown>, {
+      primaryKey: params.primaryKey,
+      outputName: params.outputName,
+    });
     const result = await this.client.castArray({
       model: this.model,
       data: params.data,
       input: { prompt: params.prompt, primaryKey: params.primaryKey },
-      output: { name: params.outputName, effectiveSchema: params.outputSchema },
+      output: { name: params.outputName, effectiveSchema: wrappedSchema },
     });
     const latencyMs = Date.now() - startTime;
 

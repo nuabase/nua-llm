@@ -30,4 +30,5 @@ LLM-MAIN-INSTRUCTION.md
 GEMINI.md
 CLAUDE.md
 AGENT.md
+TESTING.md
 .claude/settings.local.json

@@ -1,4 +1,4 @@
-import { JsonSchema } from "../types";
+export type JsonSchema = Record<string, unknown>;
 
 export interface ArraySchemaOptions {
   primaryKey: string;
@@ -17,7 +17,7 @@ export interface ArraySchemaOptions {
  */
 export function wrapArraySchema(
   schema: JsonSchema,
-  options: ArraySchemaOptions
+  options: ArraySchemaOptions,
 ): JsonSchema {
   const { primaryKey, outputName } = options;
 
@@ -50,7 +50,7 @@ export function wrapArraySchema(
  */
 export function unwrapArraySchema(
   wrappedSchema: JsonSchema,
-  outputName: string
+  outputName: string,
 ): JsonSchema | null {
   const items = wrappedSchema.items as JsonSchema | undefined;
   if (!items || typeof items !== "object") {
