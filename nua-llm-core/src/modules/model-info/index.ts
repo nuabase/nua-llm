@@ -10,6 +10,10 @@ export const CANONICAL_MODELS = [
   "gemini-2.5-flash-lite-preview-09-2025",
   "qwen3-coder-flash",
   "gpt-oss-120b",
+  "llama-3.3-70b-versatile",
+  "gpt-4o",
+  "llama-3.3-70b",
+  "gemini-2.0-flash",
 ] as const;
 
 // 2) Type is derived from the array (no duplication)
@@ -77,6 +81,30 @@ export const SUPPORTED_MODELS: Record<
     {
       provider: "openrouter",
       providerModelName: "qwen/qwen3-coder-flash",
+    },
+  ],
+  "llama-3.3-70b-versatile": [
+    {
+      provider: "groq",
+      providerModelName: "llama-3.3-70b-versatile",
+    },
+  ],
+  "gpt-4o": [
+    {
+      provider: "openrouter",
+      providerModelName: "openai/gpt-4o",
+    },
+  ],
+  "llama-3.3-70b": [
+    {
+      provider: "cerebras",
+      providerModelName: "llama-3.3-70b",
+    },
+  ],
+  "gemini-2.0-flash": [
+    {
+      provider: "gemini",
+      providerModelName: "gemini-2.0-flash",
     },
   ],
 } as const;
