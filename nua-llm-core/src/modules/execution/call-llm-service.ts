@@ -28,25 +28,33 @@ export function extractThinkingFromResponse(input: string): {
   };
 }
 
-function extractJsonFromMarkdown(input: string): string {
-  // Check if the string starts with ```json
-  const jsonCodeBlockStart = "```json";
-  const codeBlockEnd = "```";
-
+export function extractJsonFromMarkdown(input: string): string {
+  // normalize input so we can detect a fenced code block at the edges.
   const trimmed = input.trim();
+  const codeFence = "```";
+  const jsonFence = "```json";
 
-  if (trimmed.startsWith(jsonCodeBlockStart)) {
-    // Find the ending ```
-    const startIndex = jsonCodeBlockStart.length;
-    const endIndex = trimmed.lastIndexOf(codeBlockEnd);
+  // extract content when the block is explicitly labeled as JSON.
+  if (trimmed.startsWith(jsonFence)) {
+    const startIndex = jsonFence.length;
+    const endIndex = trimmed.lastIndexOf(codeFence);
 
     if (endIndex > startIndex) {
-      // Extract the content between the code block markers
       return trimmed.substring(startIndex, endIndex).trim();
     }
   }
 
-  // If no markdown formatting found, return the original string
+  // extract content when the block is fenced without a language tag.
+  if (trimmed.startsWith(codeFence) && !trimmed.startsWith(jsonFence)) {
+    const startIndex = codeFence.length;
+    const endIndex = trimmed.lastIndexOf(codeFence);
+
+    if (endIndex > startIndex) {
+      return trimmed.substring(startIndex, endIndex).trim();
+    }
+  }
+
+  // return the original input when no relevant fence is present.
   return input;
 }
 
