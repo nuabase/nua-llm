@@ -40,7 +40,8 @@ RUN pnpm install --frozen-lockfile
 COPY --chown=${APP_USER_NAME}:${APP_USER_NAME} . .
 
 # Build all packages (this respects workspace dependencies)
-RUN pnpm run build
+# Use -r to run build recursively in all workspace packages
+RUN pnpm -r run build
 
 # Use pnpm deploy to extract the api-server into a standalone production directory
 # This will include only production dependencies and handle workspace links
