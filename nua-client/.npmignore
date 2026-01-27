@@ -21,6 +21,7 @@ tsconfig.build.json
 tsconfig.json
 jest.config.js
 yarn.lock
+pnpm-lock.yaml
 .github/*
 .nvmrc
 .DS_Store

@@ -16,10 +16,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v5
         with:
           node-version-file: '.nvmrc'
-          cache: 'yarn'
-          cache-dependency-path: '**/yarn.lock'
-      - run: yarn
-      - run: npm test
+          cache: 'pnpm'
+      - run: pnpm install
+      - run: pnpm test

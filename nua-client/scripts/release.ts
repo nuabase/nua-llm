@@ -90,7 +90,7 @@ async function release() {
   const revertVersion = await updateVersion(nextVersion);
 
   await run(
-    $`npm publish --access public --tag ${versionStage || 'latest'}`,
+    $`pnpm publish --access public --tag ${versionStage || 'latest'} --no-git-checks`,
     {
       info: 'Publishing the package to npm',
       success: 'The package has been published to npm',
