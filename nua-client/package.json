@@ -17,12 +17,13 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/nuabase/ts-sdk.git"
+    "url": "git+https://github.com/nuabase/nua-llm.git",
+    "directory": "nua-client"
   },
   "bugs": {
-    "url": "https://github.com/nuabase/ts-sdk/issues"
+    "url": "https://github.com/nuabase/nua-llm/issues"
   },
-  "homepage": "https://github.com/nuabase/ts-sdk#readme",
+  "homepage": "https://github.com/nuabase/nua-llm/tree/main/nua-client#readme",
   "main": "./dist/cjs/index.cjs",
   "types": "./dist/types/index.d.cts",
   "module": "./dist/esm/index.mjs",
