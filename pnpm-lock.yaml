@@ -108,9 +108,9 @@ importers:
 
   nua-client:
     dependencies:
-      nua-llm-core:
-        specifier: workspace:*
-        version: link:../nua-llm-core
+      ajv:
+        specifier: ^8.17.1
+        version: 8.17.1
     devDependencies:
       '@eslint/js':
         specifier: ^9.35.0
@@ -166,6 +166,9 @@ importers:
       new-github-release-url:
         specifier: ^2.0.0
         version: 2.0.0
+      nua-llm-core:
+        specifier: workspace:*
+        version: link:../nua-llm-core
       open:
         specifier: ^10.2.0
         version: 10.2.0

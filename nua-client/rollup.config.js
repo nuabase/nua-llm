@@ -13,7 +13,9 @@ export default {
   ],
   plugins: [
     commonjs(),
-    nodeExternals(),
+    nodeExternals({
+      exclude: ['nua-llm-core'], // Bundle nua-llm-core since it's not published to npm
+    }),
     nodeResolve({ extensions: ['.ts', '.tsx', '.js', '.jsx'] }),
     esbuild({
       sourceMap: false,
