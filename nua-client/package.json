@@ -2,7 +2,7 @@
   "name": "nuabase",
   "description": "Nuabase TypeScript client to create typed functions from LLM prompts",
   "packageManager": "pnpm@10.20.0",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "type": "module",
   "author": "Jasim A Basheer <jasim@nuabase.com>",
   "engines": {
