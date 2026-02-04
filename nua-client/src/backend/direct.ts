@@ -27,9 +27,10 @@ export class DirectBackend implements LlmBackend {
   }
 
   async castValue<T>(params: CastValueParams): Promise<CastResult<T>> {
+    const model = params.model ?? this.model;
     const startTime = Date.now();
     const result = await this.client.castValue({
-      model: this.model,
+      model,
       input: { prompt: params.prompt, data: params.data },
       output: { name: params.outputName, effectiveSchema: params.outputSchema },
     });
@@ -48,7 +49,7 @@ export class DirectBackend implements LlmBackend {
       success: true,
       data: result.data as T,
       usage: result.usage || normalizedUsageZero,
-      model: this.model,
+      model,
       latencyMs,
       source: 'direct',
       meta: {},
@@ -56,13 +57,14 @@ export class DirectBackend implements LlmBackend {
   }
 
   async castArray<T>(params: CastArrayParams): Promise<CastResult<T[]>> {
+    const model = params.model ?? this.model;
     const startTime = Date.now();
     const wrappedSchema = wrapArraySchema(params.outputSchema as Record<string, unknown>, {
       primaryKey: params.primaryKey,
       outputName: params.outputName,
     });
     const result = await this.client.castArray({
-      model: this.model,
+      model,
       data: params.data,
       input: { prompt: params.prompt, primaryKey: params.primaryKey },
       output: { name: params.outputName, effectiveSchema: wrappedSchema },
@@ -82,7 +84,7 @@ export class DirectBackend implements LlmBackend {
       success: true,
       data: result.data as T[],
       usage: result.usage || normalizedUsageZero,
-      model: this.model,
+      model,
       latencyMs,
       source: 'direct',
       meta: {},

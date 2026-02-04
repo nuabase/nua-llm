@@ -66,6 +66,7 @@ export class GatewayBackend implements LlmBackend {
     const response = await this.post('cast/value/now', {
       input: { prompt: params.prompt, data: params.data },
       output: { name: params.outputName, schema: params.outputSchema },
+      ...(params.model && { model: params.model }),
     });
     const latencyMs = Date.now() - startTime;
 
@@ -102,6 +103,7 @@ export class GatewayBackend implements LlmBackend {
     const response = await this.post('cast/array/now', {
       input: { prompt: params.prompt, data: params.data, primaryKey: params.primaryKey },
       output: { name: params.outputName, schema: params.outputSchema },
+      ...(params.model && { model: params.model }),
     });
     const latencyMs = Date.now() - startTime;
 
@@ -137,6 +139,7 @@ export class GatewayBackend implements LlmBackend {
     const response = await this.post('cast/value', {
       input: { prompt: params.prompt, data: params.data },
       output: { name: params.outputName, schema: params.outputSchema },
+      ...(params.model && { model: params.model }),
     });
 
     if (isErrorResponse(response)) {
@@ -151,6 +154,7 @@ export class GatewayBackend implements LlmBackend {
     const response = await this.post('cast/array', {
       input: { prompt: params.prompt, data: params.data, primaryKey: params.primaryKey },
       output: { name: params.outputName, schema: params.outputSchema },
+      ...(params.model && { model: params.model }),
     });
 
     if (isErrorResponse(response)) {

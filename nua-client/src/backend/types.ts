@@ -3,6 +3,7 @@ export type CastValueParams = {
   data: unknown;
   outputName: string;
   outputSchema: object;
+  model?: string;
 };
 
 export type CastArrayParams = {
@@ -11,6 +12,7 @@ export type CastArrayParams = {
   primaryKey: string;
   outputName: string;
   outputSchema: object;
+  model?: string;
 };
 
 export type NormalizedUsage = {

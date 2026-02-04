@@ -13,6 +13,7 @@ export type OutputDef<TSchema extends z.ZodTypeAny> = {
 export type GetOptions<TSchema extends z.ZodTypeAny> = {
   input?: unknown;
   output: OutputDef<TSchema>;
+  model?: string;
 };
 
 export type ListOptions<
@@ -23,6 +24,7 @@ export type ListOptions<
   input: TData[];
   primaryKey: PrimaryKey;
   output: OutputDef<TSchema>;
+  model?: string;
 };
 
 // Result row for list operations: primaryKey + output field
@@ -75,6 +77,7 @@ export class Nua {
       data: options?.input ?? null,
       outputName,
       outputSchema: jsonSchema,
+      model: options?.model,
     });
   }
 
@@ -108,6 +111,7 @@ export class Nua {
       primaryKey: options.primaryKey,
       outputName: options.output.name,
       outputSchema: jsonSchema,
+      model: options.model,
     });
   }
 
@@ -141,6 +145,7 @@ export class Nua {
       data: options?.input ?? null,
       outputName,
       outputSchema: jsonSchema,
+      model: options?.model,
     });
   }
 
@@ -175,6 +180,7 @@ export class Nua {
       primaryKey: options.primaryKey,
       outputName: options.output.name,
       outputSchema: jsonSchema,
+      model: options.model,
     });
   }
 }
