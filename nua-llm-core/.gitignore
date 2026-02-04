@@ -1,3 +1,6 @@
+reference-repos/
+.pnpm-store/
+
 # Dependencies
 node_modules/
 

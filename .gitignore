@@ -1,3 +1,6 @@
+reference-repos/
+.pnpm-store/
+
 # Node.js
 node_modules/
 dist/
