@@ -2,10 +2,10 @@
 
 Use `release` script to publish the package:
 
-- `npm run release` – release a new patch version to npm
-- `npm run release minor` – release a new minor version to npm
-- `npm run release major` – release a new major version to npm
-- `npm run release minor -- --stage alpha` – release a new minor alpha version to npm (for example, `1.1.0-alpha.0`)
+- `pnpm release` – release a new patch version to npm
+- `pnpm release minor` – release a new minor version to npm
+- `pnpm release major` – release a new major version to npm
+- `pnpm release minor --stage alpha` – release a new minor alpha version to npm (for example, `1.1.0-alpha.0`)
 
 Note that release script will always publish public packages to npm. If you want to publish a private package, change release script in `scripts/release.ts`.
 
@@ -37,4 +37,4 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 ```
 
-3. To create a new release, use commands from the previous section but with `--no-publish` flag, for example: `npm run release minor -- --no-publish`.
+3. To create a new release, use commands from the previous section but with `--no-publish` flag, for example: `pnpm release minor --no-publish`.
