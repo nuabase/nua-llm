@@ -2,12 +2,22 @@ import { resolveConfigValue } from './env';
 
 const isBrowserEnvironment = (): boolean => typeof window !== 'undefined' && !!window.document;
 
-const isLocalhost = (): boolean => {
-  if (typeof window === 'undefined' || !window.location) {
-    return false;
-  }
+export const isDevelopmentLikeBrowserEnvironment = (): boolean => {
+  if (typeof window === 'undefined') return false;
+
+  // If we're dealing with localhost domains, then we're in dev env, and it is allowed to use private API keys
   const host = window.location.hostname;
-  return host === 'localhost' || host === '127.0.0.1';
+  if (host === 'localhost' || host === '127.0.0.1') return true;
+
+  // Node.js / Webpack / Next.js dev env
+  if (typeof process !== 'undefined') {
+    if (process.env?.NODE_ENV === 'development') {
+      return true;
+    }
+  }
+
+  // No sign of this being a dev environment. We can't allow private API keys, even if the dangerouslyAllow config value is on.
+  return false;
 };
 
 export type AuthConfig = {
@@ -37,12 +47,15 @@ export class AuthTokenManager {
     }
 
     if (this.apiKey && isBrowserEnvironment()) {
-      const allowedLocally = config.dangerouslyAllowBrowserApiKeyInLocalhost && isLocalhost();
-      if (!allowedLocally) {
+      // For local development - prototyping browser side apps - using api keys is the easiest way to get started.
+      // For that, the config value should suffice. We'll however ensure that the config value has no effect in a
+      // server / production environment.
+      if (
+        !(config.dangerouslyAllowBrowserApiKeyInLocalhost && isDevelopmentLikeBrowserEnvironment())
+      )
         throw new Error(
           'found config.apiKey. It is a private secret that must only be used in server environments.'
         );
-      }
     }
   }
 
