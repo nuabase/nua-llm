@@ -32,7 +32,7 @@ type ApiCastValueResponse = {
   isCacheHit: boolean;
   llmUsage: NormalizedUsage;
   cacheUsage: NormalizedUsage;
-  model?: string; // TODO: api-server needs to return this (nua-llm-29a)
+  model: string;
 };
 
 type ApiCastArrayResponse = {
@@ -41,7 +41,7 @@ type ApiCastArrayResponse = {
   cacheHits: number;
   llmUsage: NormalizedUsage;
   cacheUsage: NormalizedUsage;
-  model?: string; // TODO: api-server needs to return this (nua-llm-29a)
+  model: string;
 };
 
 type ApiErrorResponse = {
@@ -87,7 +87,7 @@ export class GatewayBackend implements LlmBackend {
       success: true,
       data: apiResponse.data as T,
       usage,
-      model: apiResponse.model ?? 'unknown',
+      model: apiResponse.model,
       latencyMs,
       source: 'gateway',
       meta: {
@@ -124,7 +124,7 @@ export class GatewayBackend implements LlmBackend {
       success: true,
       data: apiResponse.data as T[],
       usage,
-      model: apiResponse.model ?? 'unknown',
+      model: apiResponse.model,
       latencyMs,
       source: 'gateway',
       meta: {

@@ -27,6 +27,7 @@ export async function executeCastValueLlmRequest(
     kind: "cast/value",
     isSuccess: true,
     llmRequestId: llmRequest.id,
+    model,
   } satisfies Partial<CastValueApiResponse_Success>;
 
   // Parse input data for cache context

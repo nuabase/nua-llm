@@ -99,6 +99,7 @@ export async function executeCastArrayLlmRequest(
     llmRequestId: llmRequest.id,
     kind: "cast/array",
     isSuccess: true,
+    model,
   } satisfies Partial<CastArrayApiResponse_Success>;
 
   // dataResponse includes data, rowsWithNoResults, cacheHits, and cacheUsage

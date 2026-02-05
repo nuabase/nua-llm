@@ -24,6 +24,7 @@ export type CastArrayApiResponse_Success = {
   rowsWithNoResults: UserDataPKValue[];
   llmUsage: NormalizedUsage;
   cacheUsage: NormalizedUsage;
+  model: string;
 };
 
 export type CastArrayApiResponse_Error = {
@@ -41,6 +42,7 @@ export type CastValueApiResponse_Success = {
   isSuccess: true;
   llmUsage: NormalizedUsage;
   cacheUsage: NormalizedUsage;
+  model: string;
 };
 
 export type CastValueApiResponse_Error = {

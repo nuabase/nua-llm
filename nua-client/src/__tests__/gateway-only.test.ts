@@ -11,7 +11,11 @@
  * - Valid NUABASE_API_KEY environment variable
  */
 
-const baseUrl = process.env.NUABASE_API_URL || 'http://localhost:3030';
+import { Nua } from '../nua';
+import { z } from 'zod';
+
+const baseUrl = process.env.NUABASE_API_URL
+if (!baseUrl) throw new Error("NUABASE_API_URL must be set")
 
 // Skip all tests if SKIP_GATEWAY_TESTS is set
 const shouldSkip = process.env.SKIP_GATEWAY_TESTS === '1';
@@ -86,6 +90,41 @@ describe('gateway-only features', () => {
     }, 30000);
   });
 
+  describe('model override', () => {
+    test('response and stored request both have specified model', async () => {
+      const nua = Nua.gateway({});
+      const headers = await getAuthHeaders();
+      const specifiedModel = 'claude-sonnet-4-5';
+
+      const response = await nua.get('Return the number 99', {
+        output: {
+          name: 'result',
+          schema: z.number(),
+        },
+        model: specifiedModel,
+      });
+
+      if (!response.success) throw new Error(`error in api response: ${response.error}`);
+      if (response.source !== 'gateway') throw new Error('expected gateway source');
+
+      // Check response model matches
+      expect(response.model).toBe(specifiedModel);
+
+      // Retrieve the stored request and verify model
+      const requestId = response.meta.requestId;
+      expect(requestId).toBeDefined();
+
+      const getResponse = await fetch(`${baseUrl}/requests/${requestId}`, {
+        headers,
+      });
+
+      expect(getResponse.ok).toBe(true);
+
+      const requestData = await getResponse.json();
+      expect(requestData.model).toBe(specifiedModel);
+    }, 30000);
+  });
+
   describe('cache behavior', () => {
     test('response includes both llmUsage and cacheUsage', async () => {
       const headers = await getAuthHeaders();
@@ -121,4 +160,22 @@ describe('gateway-only features', () => {
       expect(typeof data.cacheUsage.totalTokens).toBe('number');
     }, 30000);
   });
+
+  test('model override returns specified model in response', async () => {
+    const nua = Nua.gateway({});
+    const NumberSchema = z.number();
+    const specifiedModel = 'claude-sonnet-4-5';
+
+    const response = await nua.get('Return the number 42', {
+      output: {
+        name: 'result',
+        schema: NumberSchema,
+      },
+      model: specifiedModel,
+    });
+
+    if (!response.success) throw new Error(`error in api response: ${response.error}`);
+
+    expect(response.model).toBe(specifiedModel);
+  }, 30000);
 });
