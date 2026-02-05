@@ -15,6 +15,7 @@ type GatewayApiKeyConfig = {
   apiKey?: string;
   fetchToken?: never;
   baseUrl?: string;
+  dangerouslyAllowBrowserApiKeyInLocalhost?: boolean;
 };
 
 type GatewayTokenConfig = {
