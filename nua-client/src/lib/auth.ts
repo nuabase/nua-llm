@@ -2,9 +2,18 @@ import { resolveConfigValue } from './env';
 
 const isBrowserEnvironment = (): boolean => typeof window !== 'undefined' && !!window.document;
 
+const isLocalhost = (): boolean => {
+  if (typeof window === 'undefined' || !window.location) {
+    return false;
+  }
+  const host = window.location.hostname;
+  return host === 'localhost' || host === '127.0.0.1';
+};
+
 export type AuthConfig = {
   apiKey?: string;
   fetchToken?: () => Promise<string>;
+  dangerouslyAllowBrowserApiKeyInLocalhost?: boolean;
 };
 
 export class AuthTokenManager {
@@ -28,9 +37,12 @@ export class AuthTokenManager {
     }
 
     if (this.apiKey && isBrowserEnvironment()) {
-      throw new Error(
-        'found config.apiKey. It is a private secret that must only be used in server environments.'
-      );
+      const allowedLocally = config.dangerouslyAllowBrowserApiKeyInLocalhost && isLocalhost();
+      if (!allowedLocally) {
+        throw new Error(
+          'found config.apiKey. It is a private secret that must only be used in server environments.'
+        );
+      }
     }
   }
 
