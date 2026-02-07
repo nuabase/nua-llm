@@ -13,3 +13,20 @@ export { validateJsonSchema } from "./modules/json-schema-validation/validate-js
 export { stableStringify } from "./lib/stable-stringify";
 export * from "./modules/model-info";
 export * from "./lib/schema-utils";
+export type {
+  ToolDefinition,
+  ToolExecutionResult,
+  AgentTool,
+  TextContent,
+  ToolCallContent,
+  AssistantContentBlock,
+  UserMessage,
+  AssistantMessage,
+  ToolResultMessage,
+  ConversationMessage,
+  AgenticParsedResponse,
+  AgentRunParams,
+  AgentResult,
+} from "./modules/agent/types";
+export { runAgentLoop } from "./modules/agent/agent-loop";
+export type { SendAgenticRequestFn } from "./modules/agent/agent-loop";

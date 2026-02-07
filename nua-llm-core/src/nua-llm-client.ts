@@ -9,7 +9,7 @@ import { validateMappableInputData } from "./lib/validate-mappable-input-data";
 import { callLLM } from "./modules/execution/call-llm-service";
 import { buildNuaJsonSchemaValueValidation } from "./modules/json-schema-validation/nua-json-schema-value-validation";
 import { HttpLlmClient } from "./modules/llm-client/http-llm-client";
-import { LlmProviderId } from "./modules/llm-client/provider-config";
+import { LlmProviderId, normalizedUsageZero } from "./modules/llm-client/provider-config";
 import {
   CanonicalModelName,
   parseCanonicalModelName,
@@ -18,6 +18,8 @@ import {
 import castArrayPromptBuilder from "./modules/prompt-builders/cast-array-prompt-builder";
 import castPromptBuilder from "./modules/prompt-builders/cast-prompt-builder";
 import { isNuaValidationError } from "./lib/nua-errors";
+import { AgentRunParams, AgentResult } from "./modules/agent/types";
+import { runAgentLoop } from "./modules/agent/agent-loop";
 
 export type NuaLlmClientConfig = {
   logger?: Logger;
@@ -207,6 +209,37 @@ export class NuaLlmClient {
     } catch (e) {
       return {
         success: false,
+        error: e instanceof Error ? e.message : String(e),
+      };
+    }
+  }
+
+  async runAgent(params: AgentRunParams): Promise<AgentResult> {
+    const model = this.resolveModel(params.model);
+    const client = this.getClientForModel(model);
+    const maxTokens = params.maxTokens ?? 4096;
+    const maxTurns = params.maxTurns ?? 10;
+
+    try {
+      return await runAgentLoop({
+        messages: params.messages,
+        tools: params.tools,
+        systemPrompt: params.systemPrompt,
+        maxTurns,
+        sendRequest: (messages, tools, systemPrompt) =>
+          client.sendAgenticRequest(
+            messages,
+            tools,
+            model,
+            maxTokens,
+            systemPrompt,
+          ),
+      });
+    } catch (e) {
+      return {
+        success: false,
+        messages: params.messages,
+        usage: normalizedUsageZero,
         error: e instanceof Error ? e.message : String(e),
       };
     }
