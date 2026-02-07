@@ -215,13 +215,13 @@ export class NuaLlmClient {
   }
 
   async runAgent(params: AgentRunParams): Promise<AgentResult> {
-    const model = this.resolveModel(params.model);
-    const client = this.getClientForModel(model);
-    const maxTokens = params.maxTokens ?? 4096;
-    const maxTurns = params.maxTurns ?? 10;
-
     try {
-      return await runAgentLoop({
+      const model = this.resolveModel(params.model);
+      const client = this.getClientForModel(model);
+      const maxTokens = params.maxTokens ?? 4096;
+      const maxTurns = params.maxTurns ?? 10;
+
+      return runAgentLoop({
         messages: params.messages,
         tools: params.tools,
         systemPrompt: params.systemPrompt,
@@ -238,6 +238,7 @@ export class NuaLlmClient {
     } catch (e) {
       return {
         success: false,
+        completionReason: "error",
         messages: params.messages,
         usage: normalizedUsageZero,
         error: e instanceof Error ? e.message : String(e),

@@ -1,6 +1,10 @@
 import {
-  NormalizedUsage,
-  normalizedUsageZero,
+  extractOpenAiMessageText,
+  GeminiUsageMetadata,
+  normalizeGeminiUsage,
+  normalizeOpenAiUsage,
+  OpenAiUsage,
+  ProviderRequestBase,
 } from "../llm-client/provider-config";
 import {
   AgenticParsedResponse,
@@ -9,17 +13,6 @@ import {
   ToolCallContent,
   ToolDefinition,
 } from "./types";
-
-// Re-use the ProviderRequestBase shape from provider-config
-type ProviderRequestBase = {
-  url: string;
-  method?: string;
-  headers?: Record<string, string>;
-  body?: unknown;
-  loggableUrl?: string;
-  loggableHeaders?: Record<string, string>;
-  loggableBody?: unknown;
-};
 
 // ============================================================================
 // OpenAI-style (Groq, Cerebras, OpenRouter)
@@ -157,6 +150,8 @@ type OpenAiAgenticResponse = {
   choices?: Array<{
     message?: {
       content?: string | null;
+      reasoning?: string | null;
+      reasoning_details?: Array<Record<string, unknown>>;
       tool_calls?: Array<{
         id: string;
         type: string;
@@ -169,12 +164,31 @@ type OpenAiAgenticResponse = {
     finish_reason?: string;
   }>;
   error?: { message?: string };
-  usage?: {
-    prompt_tokens?: number;
-    completion_tokens?: number;
-    total_tokens?: number;
-  } | null;
+  usage?: OpenAiUsage;
 };
+
+function parseOpenAiToolArguments(
+  rawArguments: string,
+  toolName: string,
+  errorLabel: string,
+): Record<string, unknown> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(rawArguments);
+  } catch {
+    throw new Error(
+      `${errorLabel} API error: Invalid JSON arguments for tool "${toolName}"`,
+    );
+  }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error(
+      `${errorLabel} API error: Tool "${toolName}" arguments must be a JSON object`,
+    );
+  }
+
+  return parsed as Record<string, unknown>;
+}
 
 export async function parseOpenAiAgenticResponse(
   response: Response,
@@ -208,28 +222,26 @@ export async function parseOpenAiAgenticResponse(
 
   const contentBlocks: AssistantContentBlock[] = [];
 
-  // Extract text content
-  if (choice.message.content) {
+  const assistantText = extractOpenAiMessageText(choice.message);
+  if (assistantText) {
     contentBlocks.push({
       type: "text",
-      text: choice.message.content,
+      text: assistantText,
     });
   }
 
   // Extract tool calls
   if (choice.message.tool_calls) {
     for (const tc of choice.message.tool_calls) {
-      let args: Record<string, unknown> = {};
-      try {
-        args = JSON.parse(tc.function.arguments);
-      } catch {
-        args = {};
-      }
       contentBlocks.push({
         type: "toolCall",
         id: tc.id,
         name: tc.function.name,
-        arguments: args,
+        arguments: parseOpenAiToolArguments(
+          tc.function.arguments,
+          tc.function.name,
+          errorLabel,
+        ),
       });
     }
   }
@@ -402,11 +414,7 @@ type GeminiAgenticResponse = {
     finishReason?: string;
   }>;
   error?: { message?: string };
-  usageMetadata?: {
-    promptTokenCount?: number;
-    candidatesTokenCount?: number;
-    totalTokenCount?: number;
-  };
+  usageMetadata?: GeminiUsageMetadata;
 };
 
 export async function parseGeminiAgenticResponse(
@@ -463,50 +471,5 @@ export async function parseGeminiAgenticResponse(
     },
     usage,
     stopReason,
-  };
-}
-
-// ============================================================================
-// Usage normalization helpers (local copies to avoid circular deps)
-// ============================================================================
-
-function normalizeOpenAiUsage(
-  usage:
-    | { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number }
-    | null
-    | undefined,
-): NormalizedUsage {
-  if (
-    !usage ||
-    typeof usage.prompt_tokens !== "number" ||
-    typeof usage.completion_tokens !== "number" ||
-    typeof usage.total_tokens !== "number"
-  ) {
-    return normalizedUsageZero;
-  }
-  return {
-    promptTokens: usage.prompt_tokens,
-    completionTokens: usage.completion_tokens,
-    totalTokens: usage.total_tokens,
-  };
-}
-
-function normalizeGeminiUsage(
-  usage:
-    | { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number }
-    | undefined,
-): NormalizedUsage {
-  if (
-    !usage ||
-    typeof usage.promptTokenCount !== "number" ||
-    typeof usage.candidatesTokenCount !== "number" ||
-    typeof usage.totalTokenCount !== "number"
-  ) {
-    return normalizedUsageZero;
-  }
-  return {
-    promptTokens: usage.promptTokenCount,
-    completionTokens: usage.candidatesTokenCount,
-    totalTokens: usage.totalTokenCount,
   };
 }

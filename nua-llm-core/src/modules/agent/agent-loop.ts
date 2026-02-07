@@ -1,4 +1,5 @@
 import {
+  AgentCompletionReason,
   AgentResult,
   AgentTool,
   AgenticParsedResponse,
@@ -22,13 +23,25 @@ export async function runAgentLoop(params: {
 }): Promise<AgentResult> {
   const messages = [...params.messages];
   let totalUsage: NormalizedUsage = { ...normalizedUsageZero };
+  const toolsByName = new Map(params.tools.map((tool) => [tool.name, tool]));
+  let completionReason: AgentCompletionReason = "max_turns";
 
   for (let turn = 0; turn < params.maxTurns; turn++) {
-    const response = await params.sendRequest(
-      messages,
-      params.tools,
-      params.systemPrompt,
-    );
+    let response: AgenticParsedResponse;
+    try {
+      response = await params.sendRequest(
+        messages,
+        params.tools,
+        params.systemPrompt,
+      );
+    } catch (error) {
+      return buildAgentResult(
+        messages,
+        totalUsage,
+        "error",
+        error instanceof Error ? error.message : "Unknown error",
+      );
+    }
 
     messages.push(response.message);
     totalUsage = addUsage(totalUsage, response.usage);
@@ -38,11 +51,12 @@ export async function runAgentLoop(params: {
     );
 
     if (toolCalls.length === 0 || response.stopReason === "stop") {
-      break;
+      completionReason = "stop";
+      return buildAgentResult(messages, totalUsage, completionReason);
     }
 
     for (const toolCall of toolCalls) {
-      const tool = params.tools.find((t) => t.name === toolCall.name);
+      const tool = toolsByName.get(toolCall.name);
       if (!tool) {
         messages.push({
           role: "toolResult",
@@ -75,23 +89,12 @@ export async function runAgentLoop(params: {
     }
   }
 
-  const lastAssistant = [...messages]
-    .reverse()
-    .find((m) => m.role === "assistant");
-  const textResponse =
-    lastAssistant?.role === "assistant"
-      ? lastAssistant.content
-          .filter((c): c is { type: "text"; text: string } => c.type === "text")
-          .map((c) => c.text)
-          .join("")
-      : undefined;
-
-  return {
-    success: true,
+  return buildAgentResult(
     messages,
-    textResponse: textResponse || undefined,
-    usage: totalUsage,
-  };
+    totalUsage,
+    completionReason,
+    `Reached maxTurns limit (${params.maxTurns}) before receiving a final response`,
+  );
 }
 
 function addUsage(a: NormalizedUsage, b: NormalizedUsage): NormalizedUsage {
@@ -99,5 +102,41 @@ function addUsage(a: NormalizedUsage, b: NormalizedUsage): NormalizedUsage {
     promptTokens: a.promptTokens + b.promptTokens,
     completionTokens: a.completionTokens + b.completionTokens,
     totalTokens: a.totalTokens + b.totalTokens,
+  };
+}
+
+function extractLastAssistantText(
+  messages: ConversationMessage[],
+): string | undefined {
+  const lastAssistant = [...messages]
+    .reverse()
+    .find((m) => m.role === "assistant");
+
+  if (lastAssistant?.role !== "assistant") {
+    return undefined;
+  }
+
+  const text = lastAssistant.content
+    .filter((c): c is { type: "text"; text: string } => c.type === "text")
+    .map((c) => c.text)
+    .join("");
+
+  return text || undefined;
+}
+
+function buildAgentResult(
+  messages: ConversationMessage[],
+  usage: NormalizedUsage,
+  completionReason: AgentCompletionReason,
+  error?: string,
+): AgentResult {
+  const success = completionReason === "stop" && !error;
+  return {
+    success,
+    completionReason,
+    messages,
+    textResponse: extractLastAssistantText(messages),
+    usage,
+    error,
   };
 }

@@ -26,6 +26,7 @@ export type {
   ConversationMessage,
   AgenticParsedResponse,
   AgentRunParams,
+  AgentCompletionReason,
   AgentResult,
 } from "./modules/agent/types";
 export { runAgentLoop } from "./modules/agent/agent-loop";

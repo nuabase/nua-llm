@@ -1,4 +1,4 @@
-type ProviderRequestBase = {
+export type ProviderRequestBase = {
   url: string;
   method?: string;
   headers?: Record<string, string>;
@@ -93,7 +93,7 @@ type GeminiResponse = {
   usageMetadata?: GeminiUsageMetadata;
 };
 
-type OpenAiUsage = {
+export type OpenAiUsage = {
   prompt_tokens?: number;
   completion_tokens?: number;
   total_tokens?: number;
@@ -102,14 +102,14 @@ type OpenAiUsage = {
   [key: string]: unknown;
 } | null;
 
-type GeminiUsageMetadata = {
+export type GeminiUsageMetadata = {
   promptTokenCount?: number;
   candidatesTokenCount?: number;
   totalTokenCount?: number;
   [key: string]: unknown;
 };
 
-const normalizeOpenAiUsage = (
+export const normalizeOpenAiUsage = (
   usage: OpenAiUsage | undefined,
 ): NormalizedUsage => {
   if (!usage) {
@@ -137,7 +137,7 @@ const normalizeOpenAiUsage = (
   };
 };
 
-const normalizeGeminiUsage = (
+export const normalizeGeminiUsage = (
   usage: GeminiUsageMetadata | undefined,
 ): NormalizedUsage => {
   if (!usage) {
@@ -218,7 +218,9 @@ const parseOpenAiStyleResponse =
       // TODO: An unsafe type-cast is being used here, to temporarily satisfy tsc.
       const responseBody: OpenAiStyleResponse =
         (await response.json()) as OpenAiStyleResponse;
-      const responseText = responseBody.choices?.[0]?.message?.content;
+      const responseText = extractOpenAiMessageText(
+        responseBody.choices?.[0]?.message,
+      );
 
       if (responseText) {
         return {
@@ -247,42 +249,52 @@ const parseOpenAiStyleResponse =
     }
   };
 
+const normalizeOpenAiText = (
+  value: string | null | undefined,
+): string | undefined => {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+};
+
+export const extractOpenAiMessageText = (
+  message: OpenAiThinkingMessage | undefined,
+): string | undefined => {
+  if (!message) {
+    return undefined;
+  }
+
+  return (
+    normalizeOpenAiText(message.content) ??
+    normalizeOpenAiText(message.reasoning) ??
+    normalizeOpenAiText(
+      message.reasoning_details
+        ?.map((detail) =>
+          typeof detail === "object" && detail !== null
+            ? "summary" in detail
+              ? (detail as OpenAiThinkingDetail).summary
+              : undefined
+            : undefined,
+        )
+        .find((summary) => summary !== undefined),
+    )
+  );
+};
+
 // GPT-5 (and other "thinking" models exposed via OpenRouter) return the actual
 // text inside reasoning fields instead of `message.content`, so we need a parser
 // that falls back to those fields when the content is empty.
 const parseOpenAiGPT5ThinkingStyleResponse =
   (errorLabel: string) =>
   async (response: Response): Promise<ProviderParsedResponse> => {
-    const normalize = (
-      value: string | null | undefined,
-    ): string | undefined => {
-      if (typeof value !== "string") {
-        return undefined;
-      }
-
-      const trimmed = value.trim();
-      return trimmed.length > 0 ? trimmed : undefined;
-    };
-
     if (response.status === 200) {
       // TODO: An unsafe type-cast is being used here, to temporarily satisfy tsc.
       const responseBody: OpenAiThinkingStyleResponse =
         (await response.json()) as OpenAiThinkingStyleResponse;
-      const message = responseBody.choices?.[0]?.message;
-      const content =
-        normalize(message?.content) ??
-        normalize(message?.reasoning) ??
-        normalize(
-          message?.reasoning_details
-            ?.map((detail) =>
-              typeof detail === "object" && detail !== null
-                ? "summary" in detail
-                  ? (detail as OpenAiThinkingDetail).summary
-                  : undefined
-                : undefined,
-            )
-            .find((summary) => summary !== undefined),
-        );
+      const content = extractOpenAiMessageText(responseBody.choices?.[0]?.message);
 
       if (content) {
         return {

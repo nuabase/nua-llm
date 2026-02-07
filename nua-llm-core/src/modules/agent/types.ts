@@ -77,8 +77,11 @@ export type AgentRunParams = {
   maxTurns?: number; // default 10, safety limit
 };
 
+export type AgentCompletionReason = "stop" | "max_turns" | "error";
+
 export type AgentResult = {
   success: boolean;
+  completionReason: AgentCompletionReason;
   messages: ConversationMessage[];
   textResponse?: string; // convenience: final assistant text
   usage: NormalizedUsage; // total across all turns

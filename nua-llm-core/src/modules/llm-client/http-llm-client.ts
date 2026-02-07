@@ -9,8 +9,11 @@ import {
 import { LlmClient } from "./llm-client";
 import {
   LlmProviderId,
-  providerConfigs,
+  NormalizedUsage,
+  ProviderConfig,
   ProviderParsedResponse,
+  ProviderRequestBase,
+  providerConfigs,
 } from "./provider-config";
 import {
   AgenticParsedResponse,
@@ -18,13 +21,24 @@ import {
   ToolDefinition,
 } from "../agent/types";
 import {
-  buildOpenAiAgenticRequest,
-  parseOpenAiAgenticResponse,
   buildGeminiAgenticRequest,
+  buildOpenAiAgenticRequest,
   parseGeminiAgenticResponse,
+  parseOpenAiAgenticResponse,
 } from "../agent/provider-formatters";
 
 type FetchableBody = string | undefined;
+
+type AgenticProviderCodec = {
+  buildRequest: (options: {
+    messages: ConversationMessage[];
+    tools: ToolDefinition[];
+    model: string;
+    maxTokens: number;
+    systemPrompt?: string;
+  }) => ProviderRequestBase;
+  parseResponse: (response: Response) => Promise<AgenticParsedResponse>;
+};
 
 export class HttpLlmClient implements LlmClient {
   private readonly providerId: LlmProviderId;
@@ -43,100 +57,29 @@ export class HttpLlmClient implements LlmClient {
     maxTokens: number,
     assistantPrefillPrompt?: string,
   ): Promise<ProviderParsedResponse> {
-    const provider = providerConfigs[this.providerId];
-
-    if (!provider) {
-      throw new Error(`Unknown LLM provider: ${this.providerId}`);
-    }
-
-    const providerSpecificModelName = SUPPORTED_MODELS[model].find(
-      (pm) => pm.provider === this.providerId,
-    );
-
-    if (!providerSpecificModelName) {
-      throw new Error(
-        `LLM Provider ${this.providerId} does not support model ${model}. If this is an error and the provider does support this model, please contact us to fix it`,
-      );
-    }
+    const provider = this.getProviderConfig();
+    const providerModelName = this.getProviderModelName(model);
 
     const requestOptions = provider.buildRequest(
       {
         prompt,
-        model: providerSpecificModelName.providerModelName,
-        maxTokens: maxTokens,
+        model: providerModelName,
+        maxTokens,
         assistantPrefillPrompt,
       },
       this.apiKey,
     );
 
-    const method = requestOptions.method ?? "POST";
-    const headers = requestOptions.headers ?? {};
-    const bodyPayload = requestOptions.body;
-    const body: FetchableBody =
-      typeof bodyPayload === "string"
-        ? bodyPayload
-        : bodyPayload !== undefined
-          ? JSON.stringify(bodyPayload)
-          : undefined;
-
-    const spanId = generateSpanId();
-    const startTime = Date.now();
-
-    logLlmCallStart(
-      this.logger,
-      spanId,
-      provider.providerId,
-      provider.apiOperation,
-      {
-        url: requestOptions.loggableUrl ?? requestOptions.url,
-        httpMethod: method,
-        model,
-        maxTokens,
-      },
-    );
-
-    try {
-      const response = await fetch(requestOptions.url, {
-        method,
-        headers,
-        body,
-      });
-
-      const parsedResponse: ProviderParsedResponse =
-        await provider.parseResponse(response);
-      const duration = Date.now() - startTime;
-
-      logLlmCallComplete(
-        this.logger,
-        spanId,
-        provider.providerId,
-        provider.apiOperation,
-        {
-          status: response.status,
-          responseText: parsedResponse.text,
-          headers: Object.fromEntries(response.headers.entries()),
-          usage: parsedResponse.usage,
-        },
-        duration,
-      );
-
-      return parsedResponse;
-    } catch (error) {
-      const duration = Date.now() - startTime;
-
-      logLlmCallError(
-        this.logger,
-        spanId,
-        provider.providerId,
-        provider.apiOperation,
-        error,
-        duration,
-      );
-
-      throw new Error(
-        `${provider.errorLabel} API request failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-      );
-    }
+    return this.executeProviderCall({
+      provider,
+      model,
+      maxTokens,
+      apiOperation: provider.apiOperation,
+      requestOptions,
+      parseResponse: provider.parseResponse,
+      getResponsePreview: (parsedResponse) => parsedResponse.text,
+      getUsage: (parsedResponse) => parsedResponse.usage,
+    });
   }
 
   async sendAgenticRequest(
@@ -146,12 +89,43 @@ export class HttpLlmClient implements LlmClient {
     maxTokens: number,
     systemPrompt?: string,
   ): Promise<AgenticParsedResponse> {
-    const provider = providerConfigs[this.providerId];
+    const provider = this.getProviderConfig();
+    const providerModelName = this.getProviderModelName(model);
+    const codec = this.getAgenticProviderCodec(provider.errorLabel);
 
+    const requestOptions = codec.buildRequest({
+      messages,
+      tools,
+      model: providerModelName,
+      maxTokens,
+      systemPrompt,
+    });
+
+    return this.executeProviderCall({
+      provider,
+      model,
+      maxTokens,
+      apiOperation: "agentic",
+      requestOptions,
+      parseResponse: codec.parseResponse,
+      getResponsePreview: (parsedResponse) =>
+        parsedResponse.message.content
+          .filter((content): content is { type: "text"; text: string } => content.type === "text")
+          .map((content) => content.text)
+          .join(""),
+      getUsage: (parsedResponse) => parsedResponse.usage,
+    });
+  }
+
+  private getProviderConfig(): ProviderConfig {
+    const provider = providerConfigs[this.providerId];
     if (!provider) {
       throw new Error(`Unknown LLM provider: ${this.providerId}`);
     }
+    return provider;
+  }
 
+  private getProviderModelName(model: CanonicalModelName): string {
     const providerSpecificModelName = SUPPORTED_MODELS[model].find(
       (pm) => pm.provider === this.providerId,
     );
@@ -162,71 +136,58 @@ export class HttpLlmClient implements LlmClient {
       );
     }
 
-    const requestOptions = this.buildAgenticProviderRequest(
-      {
-        messages,
-        tools,
-        model: providerSpecificModelName.providerModelName,
-        maxTokens,
-        systemPrompt,
-      },
-    );
+    return providerSpecificModelName.providerModelName;
+  }
 
-    const method = requestOptions.method ?? "POST";
-    const headers = requestOptions.headers ?? {};
-    const bodyPayload = requestOptions.body;
-    const body: FetchableBody =
-      typeof bodyPayload === "string"
-        ? bodyPayload
-        : bodyPayload !== undefined
-          ? JSON.stringify(bodyPayload)
-          : undefined;
-
+  private async executeProviderCall<T>(params: {
+    provider: ProviderConfig;
+    model: CanonicalModelName;
+    maxTokens: number;
+    apiOperation: string;
+    requestOptions: ProviderRequestBase;
+    parseResponse: (response: Response) => Promise<T>;
+    getResponsePreview: (parsedResponse: T) => string;
+    getUsage: (parsedResponse: T) => NormalizedUsage | undefined;
+  }): Promise<T> {
+    const method = params.requestOptions.method ?? "POST";
+    const headers = params.requestOptions.headers ?? {};
+    const body = this.toFetchableBody(params.requestOptions.body);
     const spanId = generateSpanId();
     const startTime = Date.now();
 
     logLlmCallStart(
       this.logger,
       spanId,
-      provider.providerId,
-      "agentic",
+      params.provider.providerId,
+      params.apiOperation,
       {
-        url: requestOptions.loggableUrl ?? requestOptions.url,
+        url: params.requestOptions.loggableUrl ?? params.requestOptions.url,
         httpMethod: method,
-        model,
-        maxTokens,
+        model: params.model,
+        maxTokens: params.maxTokens,
       },
     );
 
     try {
-      const response = await fetch(requestOptions.url, {
+      const response = await fetch(params.requestOptions.url, {
         method,
         headers,
         body,
       });
 
-      const parsedResponse = await this.parseAgenticProviderResponse(
-        response,
-        provider.errorLabel,
-      );
-
+      const parsedResponse = await params.parseResponse(response);
       const duration = Date.now() - startTime;
-
-      const responsePreview = parsedResponse.message.content
-        .filter((c): c is { type: "text"; text: string } => c.type === "text")
-        .map((c) => c.text)
-        .join("");
 
       logLlmCallComplete(
         this.logger,
         spanId,
-        provider.providerId,
-        "agentic",
+        params.provider.providerId,
+        params.apiOperation,
         {
           status: response.status,
-          responseText: responsePreview,
+          responseText: params.getResponsePreview(parsedResponse),
           headers: Object.fromEntries(response.headers.entries()),
-          usage: parsedResponse.usage,
+          usage: params.getUsage(parsedResponse),
         },
         duration,
       );
@@ -238,67 +199,71 @@ export class HttpLlmClient implements LlmClient {
       logLlmCallError(
         this.logger,
         spanId,
-        provider.providerId,
-        "agentic",
+        params.provider.providerId,
+        params.apiOperation,
         error,
         duration,
       );
 
       throw new Error(
-        `${provider.errorLabel} API request failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+        `${params.provider.errorLabel} API request failed: ${error instanceof Error ? error.message : "Unknown error"}`,
       );
     }
   }
 
-  private buildAgenticProviderRequest(options: {
-    messages: ConversationMessage[];
-    tools: ToolDefinition[];
-    model: string;
-    maxTokens: number;
-    systemPrompt?: string;
-  }) {
+  private toFetchableBody(bodyPayload: unknown): FetchableBody {
+    if (typeof bodyPayload === "string") {
+      return bodyPayload;
+    }
+    if (bodyPayload === undefined) {
+      return undefined;
+    }
+    return JSON.stringify(bodyPayload);
+  }
+
+  private getAgenticProviderCodec(errorLabel: string): AgenticProviderCodec {
     switch (this.providerId) {
       case "groq":
-        return buildOpenAiAgenticRequest(
-          options,
-          "https://api.groq.com/openai/v1/chat/completions",
-          this.apiKey,
-        );
+        return {
+          buildRequest: (options) =>
+            buildOpenAiAgenticRequest(
+              options,
+              "https://api.groq.com/openai/v1/chat/completions",
+              this.apiKey,
+            ),
+          parseResponse: (response) =>
+            parseOpenAiAgenticResponse(response, errorLabel),
+        };
       case "cerebras":
-        return buildOpenAiAgenticRequest(
-          options,
-          "https://api.cerebras.ai/v1/chat/completions",
-          this.apiKey,
-        );
+        return {
+          buildRequest: (options) =>
+            buildOpenAiAgenticRequest(
+              options,
+              "https://api.cerebras.ai/v1/chat/completions",
+              this.apiKey,
+            ),
+          parseResponse: (response) =>
+            parseOpenAiAgenticResponse(response, errorLabel),
+        };
       case "openrouter":
-        return buildOpenAiAgenticRequest(
-          options,
-          "https://openrouter.ai/api/v1/chat/completions",
-          this.apiKey,
-        );
+        return {
+          buildRequest: (options) =>
+            buildOpenAiAgenticRequest(
+              options,
+              "https://openrouter.ai/api/v1/chat/completions",
+              this.apiKey,
+            ),
+          parseResponse: (response) =>
+            parseOpenAiAgenticResponse(response, errorLabel),
+        };
       case "gemini":
-        return buildGeminiAgenticRequest(options, this.apiKey);
+        return {
+          buildRequest: (options) => buildGeminiAgenticRequest(options, this.apiKey),
+          parseResponse: parseGeminiAgenticResponse,
+        };
       default:
         throw new Error(
           `Unsupported provider for agentic requests: ${this.providerId}`,
-        );
-    }
-  }
-
-  private async parseAgenticProviderResponse(
-    response: Response,
-    errorLabel: string,
-  ): Promise<AgenticParsedResponse> {
-    switch (this.providerId) {
-      case "groq":
-      case "cerebras":
-      case "openrouter":
-        return parseOpenAiAgenticResponse(response, errorLabel);
-      case "gemini":
-        return parseGeminiAgenticResponse(response);
-      default:
-        throw new Error(
-          `Unsupported provider for agentic response parsing: ${this.providerId}`,
         );
     }
   }

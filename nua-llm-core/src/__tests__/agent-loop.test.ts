@@ -35,6 +35,7 @@ describe("runAgentLoop", () => {
     });
 
     expect(result.success).toBe(true);
+    expect(result.completionReason).toBe("stop");
     expect(result.textResponse).toBe("Hello, world!");
     expect(result.usage.totalTokens).toBe(15);
     expect(result.messages).toHaveLength(2); // user + assistant
@@ -89,6 +90,7 @@ describe("runAgentLoop", () => {
     });
 
     expect(result.success).toBe(true);
+    expect(result.completionReason).toBe("stop");
     expect(result.textResponse).toBe("The result is 4.");
     expect(callCount).toBe(2);
 
@@ -154,6 +156,7 @@ describe("runAgentLoop", () => {
     });
 
     expect(result.success).toBe(true);
+    expect(result.completionReason).toBe("stop");
     // Check the tool result error message
     const toolResult = result.messages.find((m) => m.role === "toolResult");
     expect(toolResult).toBeDefined();
@@ -206,6 +209,7 @@ describe("runAgentLoop", () => {
     });
 
     expect(result.success).toBe(true);
+    expect(result.completionReason).toBe("stop");
     const toolResult = result.messages.find((m) => m.role === "toolResult");
     if (toolResult?.role === "toolResult") {
       expect(toolResult.isError).toBe(true);
@@ -246,7 +250,9 @@ describe("runAgentLoop", () => {
       sendRequest,
     });
 
-    expect(result.success).toBe(true);
+    expect(result.success).toBe(false);
+    expect(result.completionReason).toBe("max_turns");
+    expect(result.error).toContain("Reached maxTurns");
     expect(callCount).toBe(3);
     // Usage should reflect 3 turns
     expect(result.usage.totalTokens).toBe(30);
@@ -300,6 +306,7 @@ describe("runAgentLoop", () => {
     });
 
     expect(result.success).toBe(true);
+    expect(result.completionReason).toBe("stop");
     expect(result.textResponse).toBe("Done with both.");
 
     // Messages: user, assistant (2 tool calls), toolResult, toolResult, assistant (final)
@@ -331,5 +338,46 @@ describe("runAgentLoop", () => {
     });
 
     expect(originalMessages).toHaveLength(originalLength);
+  });
+
+  it("should preserve partial state when a request fails mid-loop", async () => {
+    let callCount = 0;
+    const sendRequest: SendAgenticRequestFn = async () => {
+      callCount++;
+      if (callCount === 1) {
+        return {
+          message: {
+            role: "assistant",
+            content: [
+              {
+                type: "toolCall",
+                id: "call_1",
+                name: "tool_a",
+                arguments: {},
+              },
+            ],
+          },
+          usage: { promptTokens: 7, completionTokens: 3, totalTokens: 10 },
+          stopReason: "tool_use",
+        };
+      }
+      throw new Error("Network timeout");
+    };
+
+    const toolA = makeTool("tool_a", async () => ({ content: "done" }));
+
+    const result = await runAgentLoop({
+      messages: [{ role: "user", content: "Run tool" }],
+      tools: [toolA],
+      maxTurns: 10,
+      sendRequest,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.completionReason).toBe("error");
+    expect(result.error).toContain("Network timeout");
+    expect(result.usage.totalTokens).toBe(10);
+    expect(result.messages).toHaveLength(3); // user + assistant(tool call) + toolResult
+    expect(result.messages[2].role).toBe("toolResult");
   });
 });
