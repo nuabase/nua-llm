@@ -7,13 +7,11 @@ export const CANONICAL_MODELS = [
   "qwen3-vl-235b-a22b-instruct",
   "qwen3-max",
   "gpt-5",
-  "gemini-2.5-flash-lite-preview-09-2025",
+  "gemini-2.5-flash-lite",
+  "gemini-2.5-flash",
   "qwen3-coder-flash",
   "gpt-oss-120b",
-  "llama-3.3-70b-versatile",
-  "gpt-4o",
-  "llama-3.3-70b",
-  "gemini-2.0-flash",
+  "kimi-k2.5",
 ] as const;
 
 // 2) Type is derived from the array (no duplication)
@@ -35,6 +33,10 @@ export const SUPPORTED_MODELS: Record<
     {
       provider: "cerebras",
       providerModelName: "gpt-oss-120b",
+    },
+    {
+      provider: "groq",
+      providerModelName: "openai/gpt-oss-120b",
     },
     {
       provider: "openrouter",
@@ -71,10 +73,24 @@ export const SUPPORTED_MODELS: Record<
       providerModelName: "openai/gpt-5",
     },
   ],
-  "gemini-2.5-flash-lite-preview-09-2025": [
+  "gemini-2.5-flash-lite": [
+    {
+      provider: "gemini",
+      providerModelName: "gemini-2.5-flash-lite",
+    },
     {
       provider: "openrouter",
-      providerModelName: "google/gemini-2.5-flash-lite-preview-09-2025",
+      providerModelName: "google/gemini-2.5-flash-lite",
+    },
+  ],
+  "gemini-2.5-flash": [
+    {
+      provider: "gemini",
+      providerModelName: "gemini-2.5-flash",
+    },
+    {
+      provider: "openrouter",
+      providerModelName: "google/gemini-2.5-flash",
     },
   ],
   "qwen3-coder-flash": [
@@ -83,28 +99,10 @@ export const SUPPORTED_MODELS: Record<
       providerModelName: "qwen/qwen3-coder-flash",
     },
   ],
-  "llama-3.3-70b-versatile": [
-    {
-      provider: "groq",
-      providerModelName: "llama-3.3-70b-versatile",
-    },
-  ],
-  "gpt-4o": [
+  "kimi-k2.5": [
     {
       provider: "openrouter",
-      providerModelName: "openai/gpt-4o",
-    },
-  ],
-  "llama-3.3-70b": [
-    {
-      provider: "cerebras",
-      providerModelName: "llama-3.3-70b",
-    },
-  ],
-  "gemini-2.0-flash": [
-    {
-      provider: "gemini",
-      providerModelName: "gemini-2.0-flash",
+      providerModelName: "moonshotai/kimi-k2.5",
     },
   ],
 } as const;
@@ -120,7 +118,10 @@ export function parseCanonicalModelName(
     case "fast":
       // As per Cerebras docs, this is the fastest. https://inference-docs.cerebras.ai/models/overview
       m2 = "gpt-oss-120b";
-      // m2 = "gemini-2.5-flash-lite-preview-09-2025";
+      // m2 = "gemini-2.5-flash-lite";
+      break;
+    case "gemini":
+      m2 = "gemini-2.5-flash";
       break;
     case "qwen":
       m2 = "qwen3-vl-235b-a22b-instruct";

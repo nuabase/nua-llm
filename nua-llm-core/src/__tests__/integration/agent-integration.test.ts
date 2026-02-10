@@ -7,10 +7,10 @@ const PROVIDER_TESTS: Array<{
   model: string;
   envKey: string;
 }> = [
-  { provider: "groq", model: "llama-3.3-70b-versatile", envKey: "GROQ_API_KEY" },
-  { provider: "cerebras", model: "llama-3.3-70b", envKey: "CEREBRAS_API_KEY" },
-  { provider: "gemini", model: "gemini-2.0-flash", envKey: "GEMINI_API_KEY" },
-  { provider: "openrouter", model: "gpt-oss-120b", envKey: "OPENROUTER_API_KEY" },
+  { provider: "groq", model: "gpt-oss-120b", envKey: "GROQ_API_KEY" },
+  { provider: "cerebras", model: "gpt-oss-120b", envKey: "CEREBRAS_API_KEY" },
+  { provider: "gemini", model: "gemini-2.5-flash", envKey: "GEMINI_API_KEY" },
+  { provider: "openrouter", model: "kimi-k2.5", envKey: "OPENROUTER_API_KEY" },
 ];
 
 function makeLookupCapitalTool(): AgentTool {

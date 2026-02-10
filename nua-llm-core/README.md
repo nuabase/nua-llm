@@ -26,7 +26,7 @@ Extract a single structured object from natural language inputs.
 
 ```typescript
 const result = await client.castValue({
-  model: "gpt-4o", // or canonical names like "fast", "quality"
+  model: "fast", // or specific model names like "gpt-5", "gemini-2.5-flash"
   input: {
     prompt: "Extract the event details",
     data: "Join us for the Tech Conference on Dec 1st, 2025 at 10 AM.",
@@ -65,7 +65,7 @@ const rawData = [
 ];
 
 const result = await client.castArray({
-  model: "claude-3-5-sonnet",
+  model: "claude-sonnet-4-5",
   input: {
     prompt: "Convert price list to structured objects",
     primaryKey: "name", // Required for tracking and caching logic

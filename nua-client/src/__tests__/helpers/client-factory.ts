@@ -31,10 +31,10 @@ export function createTestClient(mode: TestMode): Nua {
     envKey: string;
     defaultModel: string;
   }> = [
-    { provider: 'groq', envKey: 'GROQ_API_KEY', defaultModel: 'llama-3.3-70b-versatile' },
-    { provider: 'openrouter', envKey: 'OPENROUTER_API_KEY', defaultModel: 'openai/gpt-4o' },
-    { provider: 'cerebras', envKey: 'CEREBRAS_API_KEY', defaultModel: 'llama-3.3-70b' },
-    { provider: 'gemini', envKey: 'GEMINI_API_KEY', defaultModel: 'gemini-2.0-flash' },
+    { provider: 'groq', envKey: 'GROQ_API_KEY', defaultModel: 'openai/gpt-oss-120b' },
+    { provider: 'openrouter', envKey: 'OPENROUTER_API_KEY', defaultModel: 'moonshotai/kimi-k2.5' },
+    { provider: 'cerebras', envKey: 'CEREBRAS_API_KEY', defaultModel: 'gpt-oss-120b' },
+    { provider: 'gemini', envKey: 'GEMINI_API_KEY', defaultModel: 'gemini-2.5-flash' },
   ];
 
   for (const config of providerConfigs) {
