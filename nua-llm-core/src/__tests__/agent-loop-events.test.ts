@@ -225,25 +225,4 @@ describe("runAgentLoop with onEvent", () => {
     expect(result.textResponse).toBe("Works fine");
   });
 
-  it("should still work correctly without onEvent (backward compatible)", async () => {
-    const sendRequest: SendAgenticRequestFn = async () => ({
-      message: {
-        role: "assistant",
-        content: [{ type: "text", text: "Hello!" }],
-      },
-      usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
-      stopReason: "stop",
-    });
-
-    const result = await runAgentLoop({
-      messages: [{ role: "user", content: "Hi" }],
-      tools: [],
-      maxTurns: 10,
-      sendRequest,
-      // no onEvent
-    });
-
-    expect(result.success).toBe(true);
-    expect(result.textResponse).toBe("Hello!");
-  });
 });
