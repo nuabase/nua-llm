@@ -28,6 +28,8 @@ export type {
   AgentRunParams,
   AgentCompletionReason,
   AgentResult,
+  AgentEvent,
+  AgentEventHandler,
 } from "./modules/agent/types";
 export { runAgentLoop } from "./modules/agent/agent-loop";
 export type { SendAgenticRequestFn } from "./modules/agent/agent-loop";

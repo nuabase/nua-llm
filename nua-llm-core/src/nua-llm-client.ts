@@ -226,6 +226,7 @@ export class NuaLlmClient {
         tools: params.tools,
         systemPrompt: params.systemPrompt,
         maxTurns,
+        onEvent: params.onEvent,
         sendRequest: (messages, tools, systemPrompt) =>
           client.sendAgenticRequest(
             messages,
@@ -233,6 +234,7 @@ export class NuaLlmClient {
             model,
             maxTokens,
             systemPrompt,
+            params.onEvent,
           ),
       });
     } catch (e) {

@@ -3,16 +3,20 @@ import {
   GeminiUsageMetadata,
   normalizeGeminiUsage,
   normalizeOpenAiUsage,
+  NormalizedUsage,
+  normalizedUsageZero,
   OpenAiUsage,
   ProviderRequestBase,
 } from "../llm-client/provider-config";
 import {
+  AgentEventHandler,
   AgenticParsedResponse,
   AssistantContentBlock,
   ConversationMessage,
   ToolCallContent,
   ToolDefinition,
 } from "./types";
+import { parseSSEStream } from "../streaming/sse-parser";
 
 // ============================================================================
 // OpenAI-style (Groq, Cerebras, OpenRouter)
@@ -109,6 +113,7 @@ export function buildOpenAiAgenticRequest(
     model: string;
     maxTokens: number;
     systemPrompt?: string;
+    stream?: boolean;
   },
   baseUrl: string,
   apiKey: string,
@@ -119,13 +124,17 @@ export function buildOpenAiAgenticRequest(
   );
   const tools = convertToolsToOpenAi(options.tools);
 
-  const body = {
+  const body: Record<string, unknown> = {
     messages,
     tools: tools.length > 0 ? tools : undefined,
     model: options.model,
     max_completion_tokens: options.maxTokens,
-    stream: false,
+    stream: options.stream ?? false,
   };
+
+  if (options.stream) {
+    body.stream_options = { include_usage: true };
+  }
 
   const headers = {
     "Content-Type": "application/json",
@@ -362,6 +371,7 @@ export function buildGeminiAgenticRequest(
     model: string;
     maxTokens: number;
     systemPrompt?: string;
+    stream?: boolean;
   },
   apiKey: string,
 ): ProviderRequestBase {
@@ -385,7 +395,9 @@ export function buildGeminiAgenticRequest(
     };
   }
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${options.model}:generateContent?key=${apiKey}`;
+  const action = options.stream ? "streamGenerateContent" : "generateContent";
+  const altParam = options.stream ? "&alt=sse" : "";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${options.model}:${action}?key=${apiKey}${altParam}`;
 
   return {
     url,
@@ -471,5 +483,245 @@ export async function parseGeminiAgenticResponse(
     },
     usage,
     stopReason,
+  };
+}
+
+// ============================================================================
+// Streaming Accumulators
+// ============================================================================
+
+// --- OpenAI streaming types ---
+
+type OpenAiStreamChunk = {
+  choices?: Array<{
+    delta?: {
+      content?: string | null;
+      tool_calls?: Array<{
+        index: number;
+        id?: string;
+        type?: string;
+        function?: {
+          name?: string;
+          arguments?: string;
+        };
+      }>;
+    };
+    finish_reason?: string | null;
+  }>;
+  usage?: OpenAiUsage;
+};
+
+function safeEmit(onEvent: AgentEventHandler | undefined, event: Parameters<AgentEventHandler>[0]): void {
+  if (!onEvent) return;
+  try {
+    onEvent(event);
+  } catch {
+    // Never let callback errors propagate
+  }
+}
+
+export async function streamOpenAiAgenticResponse(
+  response: Response,
+  errorLabel: string,
+  onEvent?: AgentEventHandler,
+): Promise<AgenticParsedResponse> {
+  if (response.status !== 200) {
+    const errorBody = await response.text();
+    try {
+      const parsed = JSON.parse(errorBody);
+      const message = parsed?.error?.message || errorBody;
+      throw new Error(
+        `${errorLabel} API error: ${response.status} - ${message}`,
+      );
+    } catch (e) {
+      if (e instanceof Error && e.message.startsWith(`${errorLabel} API error:`)) throw e;
+      throw new Error(
+        `${errorLabel} API error: ${response.status} - ${errorBody}`,
+      );
+    }
+  }
+
+  if (!response.body) {
+    throw new Error(`${errorLabel} API error: Response body is null`);
+  }
+
+  let textContent = "";
+  // Accumulate tool calls keyed by index (handles interleaved multi-tool streaming)
+  const toolCallAccumulators = new Map<number, {
+    id: string;
+    name: string;
+    arguments: string;
+  }>();
+  let finishReason: string | null = null;
+  let usage: NormalizedUsage = { ...normalizedUsageZero };
+
+  for await (const data of parseSSEStream(response.body)) {
+    let chunk: OpenAiStreamChunk;
+    try {
+      chunk = JSON.parse(data);
+    } catch {
+      continue; // Skip malformed chunks
+    }
+
+    // Extract usage from final chunk (requires stream_options.include_usage)
+    if (chunk.usage) {
+      usage = normalizeOpenAiUsage(chunk.usage);
+    }
+
+    const choice = chunk.choices?.[0];
+    if (!choice) continue;
+
+    if (choice.finish_reason) {
+      finishReason = choice.finish_reason;
+    }
+
+    const delta = choice.delta;
+    if (!delta) continue;
+
+    // Text content delta
+    if (delta.content) {
+      textContent += delta.content;
+      safeEmit(onEvent, { type: "text_delta", text: delta.content });
+    }
+
+    // Tool call deltas
+    if (delta.tool_calls) {
+      for (const tc of delta.tool_calls) {
+        const existing = toolCallAccumulators.get(tc.index);
+        if (existing) {
+          // Append incremental arguments
+          if (tc.function?.arguments) {
+            existing.arguments += tc.function.arguments;
+          }
+        } else {
+          // New tool call
+          toolCallAccumulators.set(tc.index, {
+            id: tc.id ?? "",
+            name: tc.function?.name ?? "",
+            arguments: tc.function?.arguments ?? "",
+          });
+        }
+      }
+    }
+  }
+
+  // Build content blocks
+  const contentBlocks: AssistantContentBlock[] = [];
+
+  if (textContent) {
+    contentBlocks.push({ type: "text", text: textContent });
+  }
+
+  // Sort by index to preserve order, parse accumulated arguments
+  const sortedToolCalls = [...toolCallAccumulators.entries()]
+    .sort(([a], [b]) => a - b);
+
+  for (const [, tc] of sortedToolCalls) {
+    contentBlocks.push({
+      type: "toolCall",
+      id: tc.id,
+      name: tc.name,
+      arguments: parseOpenAiToolArguments(tc.arguments, tc.name, errorLabel),
+    });
+  }
+
+  const stopReason2: "stop" | "tool_use" =
+    finishReason === "tool_calls" || sortedToolCalls.length > 0
+      ? "tool_use"
+      : "stop";
+
+  return {
+    message: { role: "assistant", content: contentBlocks },
+    usage,
+    stopReason: stopReason2,
+  };
+}
+
+// --- Gemini streaming types ---
+
+type GeminiStreamChunk = {
+  candidates?: Array<{
+    content?: {
+      parts?: Array<{
+        text?: string;
+        functionCall?: {
+          name: string;
+          args: Record<string, unknown>;
+        };
+      }>;
+    };
+    finishReason?: string;
+  }>;
+  usageMetadata?: GeminiUsageMetadata;
+};
+
+export async function streamGeminiAgenticResponse(
+  response: Response,
+  onEvent?: AgentEventHandler,
+): Promise<AgenticParsedResponse> {
+  if (response.status !== 200) {
+    const errorBody = await response.text();
+    try {
+      const parsed = JSON.parse(errorBody);
+      const message = parsed?.error?.message || errorBody;
+      throw new Error(`Gemini API error: ${response.status} - ${message}`);
+    } catch (e) {
+      if (e instanceof Error && e.message.startsWith("Gemini API error:")) throw e;
+      throw new Error(`Gemini API error: ${response.status} - ${errorBody}`);
+    }
+  }
+
+  if (!response.body) {
+    throw new Error("Gemini API error: Response body is null");
+  }
+
+  const contentBlocks: AssistantContentBlock[] = [];
+  let hasToolCalls2 = false;
+  let textContent2 = "";
+  let usage2: NormalizedUsage = { ...normalizedUsageZero };
+
+  for await (const data of parseSSEStream(response.body)) {
+    let chunk: GeminiStreamChunk;
+    try {
+      chunk = JSON.parse(data);
+    } catch {
+      continue;
+    }
+
+    if (chunk.usageMetadata) {
+      usage2 = normalizeGeminiUsage(chunk.usageMetadata);
+    }
+
+    const candidate = chunk.candidates?.[0];
+    if (!candidate?.content?.parts) continue;
+
+    for (const part of candidate.content.parts) {
+      if (part.text) {
+        textContent2 += part.text;
+        safeEmit(onEvent, { type: "text_delta", text: part.text });
+      }
+      if (part.functionCall) {
+        hasToolCalls2 = true;
+        contentBlocks.push({
+          type: "toolCall",
+          id: crypto.randomUUID(),
+          name: part.functionCall.name,
+          arguments: part.functionCall.args,
+        });
+      }
+    }
+  }
+
+  // Add accumulated text as a single block at the front
+  if (textContent2) {
+    contentBlocks.unshift({ type: "text", text: textContent2 });
+  }
+
+  const stopReason3: "stop" | "tool_use" = hasToolCalls2 ? "tool_use" : "stop";
+
+  return {
+    message: { role: "assistant", content: contentBlocks },
+    usage: usage2,
+    stopReason: stopReason3,
   };
 }

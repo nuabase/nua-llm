@@ -66,6 +66,18 @@ export type AgenticParsedResponse = {
   stopReason: "stop" | "tool_use";
 };
 
+// --- Streaming Event Types ---
+
+export type AgentEvent =
+  | { type: "turn_start"; turn: number }
+  | { type: "text_delta"; text: string }
+  | { type: "response_complete"; message: AssistantMessage; usage: NormalizedUsage; stopReason: "stop" | "tool_use" }
+  | { type: "tool_start"; toolCallId: string; toolName: string; arguments: Record<string, unknown> }
+  | { type: "tool_complete"; toolCallId: string; toolName: string; result: ToolExecutionResult }
+  | { type: "error"; error: string };
+
+export type AgentEventHandler = (event: AgentEvent) => void;
+
 // --- Agent Run Params & Result ---
 
 export type AgentRunParams = {
@@ -75,6 +87,7 @@ export type AgentRunParams = {
   tools: AgentTool[];
   maxTokens?: number;
   maxTurns?: number; // default 10, safety limit
+  onEvent?: AgentEventHandler;
 };
 
 export type AgentCompletionReason = "stop" | "max_turns" | "error";

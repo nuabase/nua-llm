@@ -1,5 +1,6 @@
 import {
   AgentCompletionReason,
+  AgentEventHandler,
   AgentResult,
   AgentTool,
   AgenticParsedResponse,
@@ -14,19 +15,32 @@ export type SendAgenticRequestFn = (
   systemPrompt?: string,
 ) => Promise<AgenticParsedResponse>;
 
+function safeEmit(onEvent: AgentEventHandler | undefined, event: Parameters<AgentEventHandler>[0]): void {
+  if (!onEvent) return;
+  try {
+    onEvent(event);
+  } catch {
+    // Never let callback errors break the loop
+  }
+}
+
 export async function runAgentLoop(params: {
   messages: ConversationMessage[];
   tools: AgentTool[];
   systemPrompt?: string;
   maxTurns: number;
   sendRequest: SendAgenticRequestFn;
+  onEvent?: AgentEventHandler;
 }): Promise<AgentResult> {
   const messages = [...params.messages];
   let totalUsage: NormalizedUsage = { ...normalizedUsageZero };
   const toolsByName = new Map(params.tools.map((tool) => [tool.name, tool]));
   let completionReason: AgentCompletionReason = "max_turns";
+  const onEvent = params.onEvent;
 
   for (let turn = 0; turn < params.maxTurns; turn++) {
+    safeEmit(onEvent, { type: "turn_start", turn });
+
     let response: AgenticParsedResponse;
     try {
       response = await params.sendRequest(
@@ -35,16 +49,25 @@ export async function runAgentLoop(params: {
         params.systemPrompt,
       );
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      safeEmit(onEvent, { type: "error", error: errorMessage });
       return buildAgentResult(
         messages,
         totalUsage,
         "error",
-        error instanceof Error ? error.message : "Unknown error",
+        errorMessage,
       );
     }
 
     messages.push(response.message);
     totalUsage = addUsage(totalUsage, response.usage);
+
+    safeEmit(onEvent, {
+      type: "response_complete",
+      message: response.message,
+      usage: response.usage,
+      stopReason: response.stopReason,
+    });
 
     const toolCalls = response.message.content.filter(
       (c): c is ToolCallContent => c.type === "toolCall",
@@ -56,14 +79,31 @@ export async function runAgentLoop(params: {
     }
 
     for (const toolCall of toolCalls) {
+      safeEmit(onEvent, {
+        type: "tool_start",
+        toolCallId: toolCall.id,
+        toolName: toolCall.name,
+        arguments: toolCall.arguments,
+      });
+
       const tool = toolsByName.get(toolCall.name);
       if (!tool) {
+        const result = {
+          content: `Tool "${toolCall.name}" not found`,
+          isError: true,
+        };
         messages.push({
           role: "toolResult",
           toolCallId: toolCall.id,
           toolName: toolCall.name,
-          content: `Tool "${toolCall.name}" not found`,
+          content: result.content,
           isError: true,
+        });
+        safeEmit(onEvent, {
+          type: "tool_complete",
+          toolCallId: toolCall.id,
+          toolName: toolCall.name,
+          result,
         });
         continue;
       }
@@ -77,13 +117,27 @@ export async function runAgentLoop(params: {
           content: result.content,
           isError: result.isError ?? false,
         });
+        safeEmit(onEvent, {
+          type: "tool_complete",
+          toolCallId: toolCall.id,
+          toolName: toolCall.name,
+          result,
+        });
       } catch (error) {
+        const errorContent = `Tool execution error: ${error instanceof Error ? error.message : "Unknown error"}`;
+        const result = { content: errorContent, isError: true };
         messages.push({
           role: "toolResult",
           toolCallId: toolCall.id,
           toolName: toolCall.name,
-          content: `Tool execution error: ${error instanceof Error ? error.message : "Unknown error"}`,
+          content: errorContent,
           isError: true,
+        });
+        safeEmit(onEvent, {
+          type: "tool_complete",
+          toolCallId: toolCall.id,
+          toolName: toolCall.name,
+          result,
         });
       }
     }

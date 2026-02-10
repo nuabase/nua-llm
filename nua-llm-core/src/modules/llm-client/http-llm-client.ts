@@ -16,6 +16,7 @@ import {
   providerConfigs,
 } from "./provider-config";
 import {
+  AgentEventHandler,
   AgenticParsedResponse,
   ConversationMessage,
   ToolDefinition,
@@ -25,6 +26,8 @@ import {
   buildOpenAiAgenticRequest,
   parseGeminiAgenticResponse,
   parseOpenAiAgenticResponse,
+  streamGeminiAgenticResponse,
+  streamOpenAiAgenticResponse,
 } from "../agent/provider-formatters";
 
 type FetchableBody = string | undefined;
@@ -36,8 +39,10 @@ type AgenticProviderCodec = {
     model: string;
     maxTokens: number;
     systemPrompt?: string;
+    stream?: boolean;
   }) => ProviderRequestBase;
   parseResponse: (response: Response) => Promise<AgenticParsedResponse>;
+  parseStreamingResponse: (response: Response, onEvent?: AgentEventHandler) => Promise<AgenticParsedResponse>;
 };
 
 export class HttpLlmClient implements LlmClient {
@@ -88,6 +93,7 @@ export class HttpLlmClient implements LlmClient {
     model: CanonicalModelName,
     maxTokens: number,
     systemPrompt?: string,
+    onEvent?: AgentEventHandler,
   ): Promise<AgenticParsedResponse> {
     const provider = this.getProviderConfig();
     const providerModelName = this.getProviderModelName(model);
@@ -99,7 +105,12 @@ export class HttpLlmClient implements LlmClient {
       model: providerModelName,
       maxTokens,
       systemPrompt,
+      stream: !!onEvent,
     });
+
+    const parseResponse = onEvent
+      ? (response: Response) => codec.parseStreamingResponse(response, onEvent)
+      : codec.parseResponse;
 
     return this.executeProviderCall({
       provider,
@@ -107,7 +118,7 @@ export class HttpLlmClient implements LlmClient {
       maxTokens,
       apiOperation: "agentic",
       requestOptions,
-      parseResponse: codec.parseResponse,
+      parseResponse,
       getResponsePreview: (parsedResponse) =>
         parsedResponse.message.content
           .filter((content): content is { type: "text"; text: string } => content.type === "text")
@@ -233,6 +244,8 @@ export class HttpLlmClient implements LlmClient {
             ),
           parseResponse: (response) =>
             parseOpenAiAgenticResponse(response, errorLabel),
+          parseStreamingResponse: (response, onEvent) =>
+            streamOpenAiAgenticResponse(response, errorLabel, onEvent),
         };
       case "cerebras":
         return {
@@ -244,6 +257,8 @@ export class HttpLlmClient implements LlmClient {
             ),
           parseResponse: (response) =>
             parseOpenAiAgenticResponse(response, errorLabel),
+          parseStreamingResponse: (response, onEvent) =>
+            streamOpenAiAgenticResponse(response, errorLabel, onEvent),
         };
       case "openrouter":
         return {
@@ -255,11 +270,15 @@ export class HttpLlmClient implements LlmClient {
             ),
           parseResponse: (response) =>
             parseOpenAiAgenticResponse(response, errorLabel),
+          parseStreamingResponse: (response, onEvent) =>
+            streamOpenAiAgenticResponse(response, errorLabel, onEvent),
         };
       case "gemini":
         return {
           buildRequest: (options) => buildGeminiAgenticRequest(options, this.apiKey),
           parseResponse: parseGeminiAgenticResponse,
+          parseStreamingResponse: (response, onEvent) =>
+            streamGeminiAgenticResponse(response, onEvent),
         };
       default:
         throw new Error(

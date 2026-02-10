@@ -1,5 +1,5 @@
 import { CanonicalModelName } from "../model-info";
-import { AgenticParsedResponse, ConversationMessage, ToolDefinition } from "../agent/types";
+import { AgentEventHandler, AgenticParsedResponse, ConversationMessage, ToolDefinition } from "../agent/types";
 import { ProviderParsedResponse } from "./provider-config";
 
 export interface LlmClient {
@@ -16,5 +16,6 @@ export interface LlmClient {
     model: CanonicalModelName,
     maxTokens: number,
     systemPrompt?: string,
+    onEvent?: AgentEventHandler,
   ): Promise<AgenticParsedResponse>;
 }
