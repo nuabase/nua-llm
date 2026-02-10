@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:unit": "jest --testPathIgnorePatterns='integration'",
-    "test:integration": "jest --testPathPattern='integration' --testTimeout=30000",
+    "test:integration": "jest --testPathPattern='integration' --testPathIgnorePatterns='/node_modules/' --testTimeout=30000",
     "test:watch": "jest --watch"
   },
   "dependencies": {
