@@ -185,8 +185,9 @@ function parseOpenAiToolArguments(
   try {
     parsed = JSON.parse(rawArguments);
   } catch {
+    const preview = rawArguments.length > 500 ? rawArguments.slice(0, 500) + "..." : rawArguments;
     throw new Error(
-      `${errorLabel} API error: Invalid JSON arguments for tool "${toolName}"`,
+      `${errorLabel} API error: Invalid JSON arguments for tool "${toolName}": ${preview}`,
     );
   }
 
