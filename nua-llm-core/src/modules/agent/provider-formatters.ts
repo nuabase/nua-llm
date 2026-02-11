@@ -181,6 +181,16 @@ function parseOpenAiToolArguments(
   toolName: string,
   errorLabel: string,
 ): Record<string, unknown> {
+  // When streaming OpenAI-compatible tool calls, the arguments field is
+  // accumulated from incremental SSE deltas. For tools with no required
+  // parameters (like db_list_tables), models often emit no argument deltas
+  // at all, leaving the accumulated string empty (""). This is valid
+  // behavior — an empty arguments string means "call with no arguments",
+  // equivalent to {}.
+  if (!rawArguments.trim()) {
+    return {};
+  }
+
   let parsed: unknown;
   try {
     parsed = JSON.parse(rawArguments);
