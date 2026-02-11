@@ -14,6 +14,7 @@ const builder = () => {
     `And it should not be wrapped in any wrapper object -- return exactly what the JSON schema is expecting.`,
     `We will validate the result with the AJV Node library, using ajv.parse, against the given schema, and we expect`,
     `it to validate correctly.`,
+    `IMPORTANT: Output raw JSON only. No markdown code fences, no explanation, no commentary, no extra fields beyond the schema. Do not correct yourself -- produce the right answer on the first try.`,
   ].join(" ");
 
   const buildSystemPrompt = (reqParams: CastValuePromptInput): string => {
