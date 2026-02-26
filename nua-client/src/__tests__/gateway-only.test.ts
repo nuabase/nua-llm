@@ -94,7 +94,7 @@ describe('gateway-only features', () => {
     test('response and stored request both have specified model', async () => {
       const nua = Nua.gateway({});
       const headers = await getAuthHeaders();
-      const specifiedModel = 'claude-sonnet-4-5';
+      const specifiedModel = 'claude-sonnet-4-6';
 
       const response = await nua.get('Return the number 99', {
         output: {
@@ -164,7 +164,7 @@ describe('gateway-only features', () => {
   test('model override returns specified model in response', async () => {
     const nua = Nua.gateway({});
     const NumberSchema = z.number();
-    const specifiedModel = 'claude-sonnet-4-5';
+    const specifiedModel = 'claude-sonnet-4-6';
 
     const response = await nua.get('Return the number 42', {
       output: {

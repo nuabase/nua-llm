@@ -65,7 +65,7 @@ const rawData = [
 ];
 
 const result = await client.castArray({
-  model: "claude-sonnet-4-5",
+  model: "claude-sonnet-4-6",
   input: {
     prompt: "Convert price list to structured objects",
     primaryKey: "name", // Required for tracking and caching logic

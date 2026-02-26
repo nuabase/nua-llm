@@ -3,7 +3,7 @@ import { LlmProviderId } from "../llm-client/provider-config";
 
 export const CANONICAL_MODELS = [
   "qwen3-30b-a3b-instruct-2507",
-  "claude-sonnet-4-5",
+  "claude-sonnet-4-6",
   "qwen3-vl-235b-a22b-instruct",
   "qwen3-max",
   "gpt-5",
@@ -49,10 +49,10 @@ export const SUPPORTED_MODELS: Record<
       providerModelName: "qwen/qwen3-30b-a3b-instruct-2507",
     },
   ],
-  "claude-sonnet-4-5": [
+  "claude-sonnet-4-6": [
     {
       provider: "openrouter",
-      providerModelName: "anthropic/claude-sonnet-4.5",
+      providerModelName: "anthropic/claude-sonnet-4.6",
     },
   ],
   "qwen3-vl-235b-a22b-instruct": [
@@ -127,7 +127,7 @@ export function parseCanonicalModelName(
       m2 = "qwen3-vl-235b-a22b-instruct";
       break;
     case "sonnet":
-      m2 = "claude-sonnet-4-5";
+      m2 = "claude-sonnet-4-6";
       break;
     case "gpt":
       m2 = "gpt-5";
