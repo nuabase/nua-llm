@@ -109,7 +109,7 @@ importers:
   nua-client:
     dependencies:
       ajv:
-        specifier: ^8.17.1
+        specifier: 8.17.1
         version: 8.17.1
     devDependencies:
       '@eslint/js':
