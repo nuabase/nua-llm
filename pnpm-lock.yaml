@@ -107,10 +107,6 @@ importers:
         version: 5.9.3
 
   nua-client:
-    dependencies:
-      ajv:
-        specifier: 8.17.1
-        version: 8.17.1
     devDependencies:
       '@eslint/js':
         specifier: ^9.35.0
@@ -121,6 +117,9 @@ importers:
       '@rollup/plugin-commonjs':
         specifier: ^28.0.6
         version: 28.0.9(rollup@4.55.1)
+      '@rollup/plugin-json':
+        specifier: ^6.1.0
+        version: 6.1.0(rollup@4.55.1)
       '@rollup/plugin-node-resolve':
         specifier: ^16.0.1
         version: 16.0.3(rollup@4.55.1)
@@ -142,6 +141,9 @@ importers:
       '@types/yargs':
         specifier: ^17.0.33
         version: 17.0.35
+      ajv:
+        specifier: ^8.17.1
+        version: 8.17.1
       chalk:
         specifier: ^5.6.2
         version: 5.6.2
@@ -1188,6 +1190,15 @@ packages:
     engines: {node: '>=16.0.0 || 14 >= 14.17'}
     peerDependencies:
       rollup: ^2.68.0||^3.0.0||^4.0.0
+    peerDependenciesMeta:
+      rollup:
+        optional: true
+
+  '@rollup/plugin-json@6.1.0':
+    resolution: {integrity: sha512-EGI2te5ENk1coGeADSIwZ7G2Q8CJS2sF120T7jLw4xFw9n7wIOXHo+kIYRAoVpJAN+kmqZSoO3Fp4JtoNF4ReA==}
+    engines: {node: '>=14.0.0'}
+    peerDependencies:
+      rollup: ^1.20.0||^2.0.0||^3.0.0||^4.0.0
     peerDependenciesMeta:
       rollup:
         optional: true
@@ -4955,6 +4966,12 @@ snapshots:
       is-reference: 1.2.1
       magic-string: 0.30.21
       picomatch: 4.0.3
+    optionalDependencies:
+      rollup: 4.55.1
+
+  '@rollup/plugin-json@6.1.0(rollup@4.55.1)':
+    dependencies:
+      '@rollup/pluginutils': 5.3.0(rollup@4.55.1)
     optionalDependencies:
       rollup: 4.55.1
 
