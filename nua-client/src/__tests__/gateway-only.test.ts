@@ -14,8 +14,8 @@
 import { Nua } from '../nua';
 import { z } from 'zod';
 
-const baseUrl = process.env.NUABASE_API_URL
-if (!baseUrl) throw new Error("NUABASE_API_URL must be set")
+const baseUrl = process.env.NUABASE_API_URL;
+if (!baseUrl) throw new Error('NUABASE_API_URL must be set');
 
 // Skip all tests if SKIP_GATEWAY_TESTS is set
 const shouldSkip = process.env.SKIP_GATEWAY_TESTS === '1';
