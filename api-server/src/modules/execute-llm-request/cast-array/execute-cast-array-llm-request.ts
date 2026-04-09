@@ -57,6 +57,8 @@ export async function executeCastArrayLlmRequest(
   if (cacheService.uncachedRows.length == 0) {
     llmOutputMappedRows = [];
     usage = normalizedUsageZero;
+    const table = new LlmRequestModel();
+    await table.update(llmRequest.id, { full_prompt: "//# All rows served from cache" });
   } else {
     const params = {
       model,
