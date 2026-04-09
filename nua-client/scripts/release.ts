@@ -91,7 +91,9 @@ async function release() {
 
   signale.info('Publishing the package to npm');
   try {
-    await $({ stdio: 'inherit' })`pnpm publish --access public --tag ${versionStage || 'latest'} --no-git-checks`;
+    await $({
+      stdio: 'inherit',
+    })`pnpm publish --access public --tag ${versionStage || 'latest'} --no-git-checks`;
     signale.success('The package has been published to npm');
   } catch (err) {
     signale.error('Failed to publish the package to npm');
