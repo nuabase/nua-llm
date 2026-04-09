@@ -32,6 +32,26 @@ app.use(cors(corsOptions));
 
 app.use(express.json());
 
+// Dokku health check: responds before HTTPS enforcement since the
+// container-level probe never passes through nginx. Only accepts
+// requests from the internal Docker network (private IP ranges).
+app.get("/healthz", (req: Request, res: Response, next: Function) => {
+  const ip = req.ip || "";
+  const isPrivate =
+    ip.includes("127.0.0.1") ||
+    ip.includes("::1") ||
+    ip.includes("10.") ||
+    ip.includes("172.16.") ||
+    ip.includes("172.17.") ||
+    ip.includes("172.18.") ||
+    ip.includes("172.19.") ||
+    ip.includes("192.168.");
+  if (!isPrivate) {
+    return next();
+  }
+  res.status(200).json({ status: "ok" });
+});
+
 app.use((req: Request, res: Response, next: Function) => {
   // TODO: make this a secret value thru ansible secrets and env, rather than
   // hard-coding. Currently this value will be added to

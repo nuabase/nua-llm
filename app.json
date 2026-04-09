@@ -1,0 +1,14 @@
+{
+  "healthchecks": {
+    "web": [
+      {
+        "type": "startup",
+        "name": "web check",
+        "path": "/healthz",
+        "port": 3030,
+        "attempts": 3,
+        "wait": 5
+      }
+    ]
+  }
+}
