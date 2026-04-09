@@ -3,7 +3,7 @@ import { LlmClient } from "../llm-client/llm-client";
 import { NormalizedUsage } from "../llm-client/provider-config";
 import { CanonicalModelName } from "../model-info";
 import {
-  extractJsonFromMarkdown,
+  parseJsonFromLlmResponse,
   extractThinkingFromResponse,
 } from "./llm-response-extraction";
 
@@ -40,10 +40,8 @@ export async function callLLM(
 
       let parsedResponse: object;
       try {
-        let { thinking, cleanedResponse } =
-          extractThinkingFromResponse(response);
-        cleanedResponse = extractJsonFromMarkdown(cleanedResponse);
-        parsedResponse = JSON.parse(cleanedResponse);
+        const { cleanedResponse } = extractThinkingFromResponse(response);
+        parsedResponse = parseJsonFromLlmResponse(cleanedResponse);
       } catch (parseError) {
         const errorMessage = `Failed to parse LLM response as JSON: ${parseError instanceof Error ? parseError.message : "Unknown parsing error"}`;
         throw new Error(`${errorMessage}\n\nRaw LLM response:\n${response}`);

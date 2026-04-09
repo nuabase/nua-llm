@@ -41,7 +41,7 @@ export function extractThinkingFromResponse(input: string): {
   };
 }
 
-export function extractJsonFromMarkdown(input: string): string {
+export function parseJsonFromLlmResponse(input: string): object {
   const trimmed = input.trim();
   const codeFence = "```";
   const jsonFence = "```json";
@@ -52,7 +52,7 @@ export function extractJsonFromMarkdown(input: string): string {
     const startIndex = lastJsonFence + jsonFence.length;
     const endIndex = trimmed.indexOf(codeFence, startIndex);
     if (endIndex !== -1) {
-      return trimmed.substring(startIndex, endIndex).trim();
+      return JSON.parse(trimmed.substring(startIndex, endIndex).trim());
     }
   }
 
@@ -61,7 +61,7 @@ export function extractJsonFromMarkdown(input: string): string {
     const startIndex = firstCodeFence + codeFence.length;
     const endIndex = trimmed.indexOf(codeFence, startIndex);
     if (endIndex !== -1) {
-      return trimmed.substring(startIndex, endIndex).trim();
+      return JSON.parse(trimmed.substring(startIndex, endIndex).trim());
     }
   }
 
@@ -75,15 +75,13 @@ export function extractJsonFromMarkdown(input: string): string {
     let j = trimmed.lastIndexOf(closeChar);
 
     while (j > i) {
-      const candidate = trimmed.substring(i, j + 1);
       try {
-        JSON.parse(candidate);
-        return candidate;
+        return JSON.parse(trimmed.substring(i, j + 1));
       } catch {
         j = trimmed.lastIndexOf(closeChar, j - 1);
       }
     }
   }
 
-  return trimmed;
+  return JSON.parse(trimmed);
 }
