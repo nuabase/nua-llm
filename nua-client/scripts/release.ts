@@ -89,15 +89,16 @@ async function release() {
 
   const revertVersion = await updateVersion(nextVersion);
 
-  await run(
-    $`pnpm publish --access public --tag ${versionStage || 'latest'} --no-git-checks`,
-    {
-      info: 'Publishing the package to npm',
-      success: 'The package has been published to npm',
-      error: 'Failed to publish the package to npm',
-    },
-    revertVersion
-  );
+  signale.info('Publishing the package to npm');
+  try {
+    await $({ stdio: 'inherit' })`pnpm publish --access public --tag ${versionStage || 'latest'} --no-git-checks`;
+    signale.success('The package has been published to npm');
+  } catch (err) {
+    signale.error('Failed to publish the package to npm');
+    signale.error(err);
+    await revertVersion();
+    process.exit(1);
+  }
 
   await git.add([packageJsonPath]);
   await git.commit(`Release ${nextVersion}`);
