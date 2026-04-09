@@ -42,31 +42,48 @@ export function extractThinkingFromResponse(input: string): {
 }
 
 export function extractJsonFromMarkdown(input: string): string {
-  // normalize input so we can detect a fenced code block at the edges.
   const trimmed = input.trim();
   const codeFence = "```";
   const jsonFence = "```json";
 
-  // extract content when the block is explicitly labeled as JSON.
-  if (trimmed.startsWith(jsonFence)) {
-    const startIndex = jsonFence.length;
-    const endIndex = trimmed.lastIndexOf(codeFence);
-
-    if (endIndex > startIndex) {
+  // Fast path: extract from code fences (handles the common cases).
+  const lastJsonFence = trimmed.lastIndexOf(jsonFence);
+  if (lastJsonFence !== -1) {
+    const startIndex = lastJsonFence + jsonFence.length;
+    const endIndex = trimmed.indexOf(codeFence, startIndex);
+    if (endIndex !== -1) {
       return trimmed.substring(startIndex, endIndex).trim();
     }
   }
 
-  // extract content when the block is fenced without a language tag.
-  if (trimmed.startsWith(codeFence) && !trimmed.startsWith(jsonFence)) {
-    const startIndex = codeFence.length;
-    const endIndex = trimmed.lastIndexOf(codeFence);
-
-    if (endIndex > startIndex) {
+  const firstCodeFence = trimmed.indexOf(codeFence);
+  if (firstCodeFence !== -1) {
+    const startIndex = firstCodeFence + codeFence.length;
+    const endIndex = trimmed.indexOf(codeFence, startIndex);
+    if (endIndex !== -1) {
       return trimmed.substring(startIndex, endIndex).trim();
     }
   }
 
-  // return the original input when no relevant fence is present.
-  return input;
+  // Slow path: scan for valid JSON by trying each { or [ as a start position,
+  // paired with matching close brackets from the end.
+  for (let i = 0; i < trimmed.length; i++) {
+    const ch = trimmed[i];
+    if (ch !== "{" && ch !== "[") continue;
+
+    const closeChar = ch === "{" ? "}" : "]";
+    let j = trimmed.lastIndexOf(closeChar);
+
+    while (j > i) {
+      const candidate = trimmed.substring(i, j + 1);
+      try {
+        JSON.parse(candidate);
+        return candidate;
+      } catch {
+        j = trimmed.lastIndexOf(closeChar, j - 1);
+      }
+    }
+  }
+
+  return trimmed;
 }
