@@ -47,12 +47,16 @@ export function parseJsonFromLlmResponse(input: string): object {
   const jsonFence = "```json";
 
   // Fast path: extract from code fences (handles the common cases).
+  // Wrapped in try/catch so we fall through to the slow path if the fenced
+  // content isn't valid JSON (e.g. a non-JSON ``` block before the real data).
   const lastJsonFence = trimmed.lastIndexOf(jsonFence);
   if (lastJsonFence !== -1) {
     const startIndex = lastJsonFence + jsonFence.length;
     const endIndex = trimmed.indexOf(codeFence, startIndex);
     if (endIndex !== -1) {
-      return JSON.parse(trimmed.substring(startIndex, endIndex).trim());
+      try {
+        return JSON.parse(trimmed.substring(startIndex, endIndex).trim());
+      } catch { /* fall through to slow path */ }
     }
   }
 
@@ -61,26 +65,42 @@ export function parseJsonFromLlmResponse(input: string): object {
     const startIndex = firstCodeFence + codeFence.length;
     const endIndex = trimmed.indexOf(codeFence, startIndex);
     if (endIndex !== -1) {
-      return JSON.parse(trimmed.substring(startIndex, endIndex).trim());
+      try {
+        return JSON.parse(trimmed.substring(startIndex, endIndex).trim());
+      } catch { /* fall through to slow path */ }
     }
   }
 
-  // Slow path: scan for valid JSON by trying each { or [ as a start position,
-  // paired with matching close brackets from the end.
-  for (let i = 0; i < trimmed.length; i++) {
-    const ch = trimmed[i];
-    if (ch !== "{" && ch !== "[") continue;
-
-    const closeChar = ch === "{" ? "}" : "]";
-    let j = trimmed.lastIndexOf(closeChar);
-
-    while (j > i) {
-      try {
-        return JSON.parse(trimmed.substring(i, j + 1));
-      } catch {
-        j = trimmed.lastIndexOf(closeChar, j - 1);
+  // Slow path: precompute matching brackets in O(n), then try JSON.parse
+  // only on balanced substrings.
+  const matchingClose = new Array(trimmed.length).fill(-1);
+  const stack: number[] = [];
+  let inString = false;
+  for (let k = 0; k < trimmed.length; k++) {
+    if (inString) {
+      if (trimmed[k] === "\\") k++;
+      else if (trimmed[k] === '"') inString = false;
+      continue;
+    }
+    if (trimmed[k] === '"') { inString = true; continue; }
+    if (trimmed[k] === "{" || trimmed[k] === "[") {
+      stack.push(k);
+    } else if (trimmed[k] === "}" || trimmed[k] === "]") {
+      if (stack.length > 0) {
+        const open = stack.pop()!;
+        const expected = trimmed[open] === "{" ? "}" : "]";
+        if (trimmed[k] === expected) matchingClose[open] = k;
       }
     }
+  }
+
+  for (let i = 0; i < trimmed.length; i++) {
+    if (trimmed[i] !== "{" && trimmed[i] !== "[") continue;
+    const j = matchingClose[i];
+    if (j === -1) continue;
+    try {
+      return JSON.parse(trimmed.substring(i, j + 1));
+    } catch { continue; }
   }
 
   return JSON.parse(trimmed);
