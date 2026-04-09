@@ -1,11 +1,12 @@
 {
+  "_comment": "Port 5000: Dokku's default when no EXPOSE directive exists. It proxies 80→5000 and sets PORT=5000 in the container. See https://dokku.com/docs/networking/port-management/",
   "healthchecks": {
     "web": [
       {
         "type": "startup",
         "name": "web check",
         "path": "/healthz",
-        "port": 3030,
+        "port": 5000,
         "attempts": 3,
         "wait": 5
       }
