@@ -131,6 +131,7 @@ export class NuaLlmClient {
       return {
         success: false,
         error: e instanceof Error ? e.message : String(e),
+        prompt,
       };
     }
   }
@@ -210,6 +211,7 @@ export class NuaLlmClient {
       return {
         success: false,
         error: e instanceof Error ? e.message : String(e),
+        prompt,
       };
     }
   }

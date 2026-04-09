@@ -4,7 +4,7 @@ import { ValueCacheService } from "nua-llm-caching";
 import { NuaLlmClient, ConsoleLogger, normalizedUsageZero } from "nua-llm-core";
 import { CastValueApiResponse_Success } from "#modules/execute-llm-request/types";
 import { CanonicalModelName } from "nua-llm-core";
-import { LlmRequest } from "../../../models/llm-request-model";
+import { LlmRequest, LlmRequestModel } from "../../../models/llm-request-model";
 
 // Helper to get initialized client (singleton-like or per-request if logging context needed)
 // For now, we reuse the config logic.
@@ -78,7 +78,14 @@ export async function executeCastValueLlmRequest(
     usage,
     success,
     error,
+    prompt: fullPrompt,
   } = await nuaClient.castValue(params);
+
+  // Save the prompt regardless of success/failure so we can reproduce errors
+  if (fullPrompt) {
+    const table = new LlmRequestModel();
+    await table.update(llmRequest.id, { full_prompt: fullPrompt });
+  }
 
   if (!success || !transformedResult) {
     throw new Error(`Cast value failed: ${error}`);

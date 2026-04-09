@@ -77,20 +77,18 @@ export async function executeCastArrayLlmRequest(
 
     const { data, usage: resultUsage, success, error, prompt } = await nuaClient.castArray(params);
 
+    // Save the prompt regardless of success/failure so we can reproduce errors
+    if (prompt) {
+      const table = new LlmRequestModel();
+      await table.update(llmRequest.id, { full_prompt: prompt });
+    }
+
     if (!success || !data) {
       throw new Error(`Cast array failed: ${error}`);
     }
 
     usage = resultUsage || normalizedUsageZero;
     llmOutputMappedRows = data as MappedLlmOutputEffectiveSchemaRow[];
-
-    // Save the prompt used
-    if (prompt) {
-      const table = new LlmRequestModel();
-      await table.update(llmRequest.id, {
-        full_prompt: prompt,
-      });
-    }
   }
 
   // Let's save the results and update the cache (with per-row token estimates)

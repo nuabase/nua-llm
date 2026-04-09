@@ -46,7 +46,7 @@ export async function callLLM(
         parsedResponse = JSON.parse(cleanedResponse);
       } catch (parseError) {
         const errorMessage = `Failed to parse LLM response as JSON: ${parseError instanceof Error ? parseError.message : "Unknown parsing error"}`;
-        throw new Error(errorMessage);
+        throw new Error(`${errorMessage}\n\nRaw LLM response:\n${response}`);
       }
 
       const validationResult = validationFunction(parsedResponse);
@@ -59,7 +59,7 @@ export async function callLLM(
 
       const errorMessage = `Validation failed: ${validationResult.error || "Unknown validation error"}`;
 
-      throw new Error(errorMessage);
+      throw new Error(`${errorMessage}\n\nRaw LLM response:\n${response}`);
     } catch (error) {
       const isLastAttempt = attempt === maxRetries;
       const errorMessage =
