@@ -3,7 +3,9 @@ import { LlmProviderId } from "../llm-client/provider-config";
 
 export const CANONICAL_MODELS = [
   "qwen3-30b-a3b-instruct-2507",
+  "claude-opus-4-7",
   "claude-sonnet-4-6",
+  "claude-haiku-4-5",
   "qwen3-vl-235b-a22b-instruct",
   "qwen3-max",
   "gpt-5",
@@ -12,6 +14,7 @@ export const CANONICAL_MODELS = [
   "qwen3-coder-flash",
   "gpt-oss-120b",
   "kimi-k2.5",
+  "kimi-k2.6",
 ] as const;
 
 // 2) Type is derived from the array (no duplication)
@@ -49,10 +52,22 @@ export const SUPPORTED_MODELS: Record<
       providerModelName: "qwen/qwen3-30b-a3b-instruct-2507",
     },
   ],
+  "claude-opus-4-7": [
+    {
+      provider: "openrouter",
+      providerModelName: "anthropic/claude-opus-4.7",
+    },
+  ],
   "claude-sonnet-4-6": [
     {
       provider: "openrouter",
       providerModelName: "anthropic/claude-sonnet-4.6",
+    },
+  ],
+  "claude-haiku-4-5": [
+    {
+      provider: "openrouter",
+      providerModelName: "anthropic/claude-haiku-4.5",
     },
   ],
   "qwen3-vl-235b-a22b-instruct": [
@@ -105,6 +120,12 @@ export const SUPPORTED_MODELS: Record<
       providerModelName: "moonshotai/kimi-k2.5",
     },
   ],
+  "kimi-k2.6": [
+    {
+      provider: "openrouter",
+      providerModelName: "moonshotai/kimi-k2.6",
+    },
+  ],
 } as const;
 
 export function parseCanonicalModelName(
@@ -128,6 +149,15 @@ export function parseCanonicalModelName(
       break;
     case "sonnet":
       m2 = "claude-sonnet-4-6";
+      break;
+    case "opus":
+      m2 = "claude-opus-4-7";
+      break;
+    case "haiku":
+      m2 = "claude-haiku-4-5";
+      break;
+    case "kimi":
+      m2 = "kimi-k2.6";
       break;
     case "gpt":
       m2 = "gpt-5";
