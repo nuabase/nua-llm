@@ -15,6 +15,9 @@ router.get(
   bearerApiKeyAuth,
   async (req: Request, res: ExpressResponse) => {
     const { llm_request_id } = req.params;
+    if (typeof llm_request_id !== "string") {
+      return sendNotFound(req, res, "Invalid llm_request_id");
+    }
 
     const currentUser = sendUnauthorized_unlessUser(req, res);
     if (!currentUser) return;

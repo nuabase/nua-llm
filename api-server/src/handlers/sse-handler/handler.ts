@@ -27,6 +27,9 @@ router.get(
     // it out without any libraries.
 
     const { llm_request_id } = req.params;
+    if (typeof llm_request_id !== "string") {
+      return sendNotFound(req, res, "Invalid llm_request_id");
+    }
 
     const currentUser = sendUnauthorized_unlessUser(req, res);
     if (!currentUser) return;
