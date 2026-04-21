@@ -27,20 +27,6 @@ export const generateSpanId = (): string => crypto.randomUUID();
 // ============================================================================
 
 /**
- * Generic text truncation for logging previews
- */
-export function truncateText(
-  text: string,
-  limit: number = 500,
-): { preview: string; length: number } {
-  const length = text.length;
-  if (length <= limit) {
-    return { preview: text, length };
-  }
-  return { preview: text.slice(0, limit), length };
-}
-
-/**
  * Generic header filtering with allowlist and optional redaction
  */
 export function pickHeaders(
@@ -83,7 +69,7 @@ interface LlmRequestLog {
 
 interface LlmResponseLog {
   status: number;
-  responseText: string;
+  responseLength: number;
   headers: Record<string, string>;
   usage?: { promptTokens: number; completionTokens: number; totalTokens: number };
 }
@@ -122,16 +108,14 @@ export const logLlmCallComplete = (
   response: LlmResponseLog,
   duration: number,
 ) => {
-  const { headers, responseText, ...rest } = response;
-  const { preview: responsePreview, length: responseLength } = truncateText(responseText);
+  // responseLength, not a preview: cast responses are restructured customer data.
+  const { headers, ...rest } = response;
   logger.info("LLM call completed", {
     type: "llm_call_complete",
     span_id: spanId,
     service,
     method,
     ...rest,
-    responsePreview,
-    responseLength,
     ...pickHeaders(headers, LLM_RESPONSE_HEADER_ALLOWLIST),
     duration_ms: duration,
   });

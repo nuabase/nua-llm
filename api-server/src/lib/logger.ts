@@ -1,7 +1,6 @@
 import winston from "winston";
 import {
   generateSpanId,
-  truncateText,
   pickHeaders,
   normalizeError,
 } from "nua-llm-core";
@@ -136,11 +135,12 @@ const API_REQUEST_HEADER_ALLOWLIST = new Set([
 // Headers to log with redacted values (presence is useful, value is sensitive)
 const REDACTED_HEADERS = new Set(["authorization"]);
 
-function truncateBody(body: unknown): { bodyPreview?: string; bodyLength?: number } {
+// Request bodies on cast endpoints carry end-customer data, so never emit a
+// content preview — only the byte length, for rough observability.
+function bodySize(body: unknown): { bodyLength?: number } {
   if (body === null || body === undefined) return {};
   const text = typeof body === "string" ? body : JSON.stringify(body);
-  const { preview, length } = truncateText(text);
-  return { bodyPreview: preview, bodyLength: length };
+  return { bodyLength: text.length };
 }
 
 export const logApiCallStart = (
@@ -158,7 +158,7 @@ export const logApiCallStart = (
     request: {
       ...rest,
       headers: pickHeaders(headers, API_REQUEST_HEADER_ALLOWLIST, REDACTED_HEADERS),
-      ...truncateBody(body),
+      ...bodySize(body),
     },
   });
 };

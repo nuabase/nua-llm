@@ -82,7 +82,7 @@ export class HttpLlmClient implements LlmClient {
       apiOperation: provider.apiOperation,
       requestOptions,
       parseResponse: provider.parseResponse,
-      getResponsePreview: (parsedResponse) => parsedResponse.text,
+      getResponseLength: (parsedResponse) => parsedResponse.text.length,
       getUsage: (parsedResponse) => parsedResponse.usage,
     });
   }
@@ -119,11 +119,11 @@ export class HttpLlmClient implements LlmClient {
       apiOperation: "agentic",
       requestOptions,
       parseResponse,
-      getResponsePreview: (parsedResponse) =>
-        parsedResponse.message.content
-          .filter((content): content is { type: "text"; text: string } => content.type === "text")
-          .map((content) => content.text)
-          .join(""),
+      getResponseLength: (parsedResponse) =>
+        parsedResponse.message.content.reduce(
+          (total, content) => total + (content.type === "text" ? content.text.length : 0),
+          0,
+        ),
       getUsage: (parsedResponse) => parsedResponse.usage,
     });
   }
@@ -157,7 +157,7 @@ export class HttpLlmClient implements LlmClient {
     apiOperation: string;
     requestOptions: ProviderRequestBase;
     parseResponse: (response: Response) => Promise<T>;
-    getResponsePreview: (parsedResponse: T) => string;
+    getResponseLength: (parsedResponse: T) => number;
     getUsage: (parsedResponse: T) => NormalizedUsage | undefined;
   }): Promise<T> {
     const method = params.requestOptions.method ?? "POST";
@@ -196,7 +196,7 @@ export class HttpLlmClient implements LlmClient {
         params.apiOperation,
         {
           status: response.status,
-          responseText: params.getResponsePreview(parsedResponse),
+          responseLength: params.getResponseLength(parsedResponse),
           headers: Object.fromEntries(response.headers.entries()),
           usage: params.getUsage(parsedResponse),
         },
