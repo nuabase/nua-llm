@@ -23,9 +23,9 @@ export type ModelInput = ProviderModel | { alias: ModelAliasName };
 
 export const MODEL_ALIASES: Record<ModelAliasName, ProviderModel[]> = {
   fast: [
-    { provider: "cerebras", model: "gpt-oss-120b" },
-    { provider: "groq", model: "openai/gpt-oss-120b" },
-    { provider: "openrouter", model: "openai/gpt-oss-120b" },
+    { provider: "cerebras", model: "zai-glm-4.7" },
+    { provider: "groq", model: "qwen/qwen3.6-27b" },
+    { provider: "openrouter", model: "z-ai/glm-5.2" },
   ],
   gemini: [
     { provider: "gemini", model: "gemini-2.5-flash" },
@@ -44,7 +44,7 @@ export const MODEL_ALIASES: Record<ModelAliasName, ProviderModel[]> = {
     { provider: "openrouter", model: "anthropic/claude-haiku-4.5" },
   ],
   kimi: [
-    { provider: "openrouter", model: "moonshotai/kimi-k2.6" },
+    { provider: "openrouter", model: "moonshotai/kimi-k2.7-code" },
   ],
   gpt: [
     { provider: "openrouter", model: "openai/gpt-5" },
