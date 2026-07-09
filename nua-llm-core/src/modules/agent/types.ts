@@ -1,4 +1,5 @@
 import { NormalizedUsage } from "../llm-client/provider-config";
+import { ModelInput } from "../model-info";
 
 // --- Tool Types ---
 
@@ -81,7 +82,7 @@ export type AgentEventHandler = (event: AgentEvent) => void;
 // --- Agent Run Params & Result ---
 
 export type AgentRunParams = {
-  model: string;
+  model?: ModelInput;
   systemPrompt?: string;
   messages: ConversationMessage[];
   tools: AgentTool[];

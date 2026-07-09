@@ -3,7 +3,7 @@ import { cacheStore } from "#lib/cacheStore";
 import { ValueCacheService } from "nua-llm-caching";
 import { NuaLlmClient, ConsoleLogger, normalizedUsageZero } from "nua-llm-core";
 import { CastValueApiResponse_Success } from "#modules/execute-llm-request/types";
-import { CanonicalModelName } from "nua-llm-core";
+import { ProviderModel } from "nua-llm-core";
 import { LlmRequest, LlmRequestModel } from "../../../models/llm-request-model";
 
 // Helper to get initialized client (singleton-like or per-request if logging context needed)
@@ -14,20 +14,23 @@ const nuaClient = new NuaLlmClient({
     cerebras: { apiKey: config.llm.cerebrasApiKey },
     groq: { apiKey: config.llm.groqApiKey },
     openrouter: { apiKey: config.llm.openRouterApiKey },
-    // others if needed
+    gemini: config.llm.geminiApiKey
+      ? { apiKey: config.llm.geminiApiKey }
+      : undefined,
   },
 });
 
 export async function executeCastValueLlmRequest(
   llmRequest: LlmRequest,
   effectiveSchema: object,
-  model: CanonicalModelName,
+  model: ProviderModel,
 ): Promise<CastValueApiResponse_Success> {
   const baseResponse = {
     kind: "cast/value",
     isSuccess: true,
     llmRequestId: llmRequest.id,
-    model,
+    provider: model.provider,
+    model: model.model,
   } satisfies Partial<CastValueApiResponse_Success>;
 
   // Parse input data for cache context

@@ -187,8 +187,22 @@ Creates a client that connects to the Nuabase API gateway. Use this for producti
 **`Nua.direct(config)`**
 Creates a client that calls LLM providers directly (in-process). Use this for serverless, edge functions, or CLI tools where you don't need the gateway infrastructure.
 
-- `model: string` – The model to use (e.g., `'gpt-4o-mini'`).
-- `providers: { openai?: { apiKey: string }, ... }` – Provider credentials.
+- `model?: ModelInput` – Optional default model. Omit it to use `{ alias: 'fast' }`.
+- `providers: { groq?: { apiKey: string }, cerebras?: { apiKey: string }, gemini?: { apiKey: string }, openrouter?: { apiKey: string } }` – Provider credentials.
+
+Model inputs are objects, not provider-prefixed strings:
+
+```ts
+await nua.get('Extract the company name', {
+  output: { name: 'companyName', schema: z.string() },
+  model: { provider: 'openrouter', model: 'z-ai/glm-5.2' },
+});
+
+await nua.get('Extract the company name', {
+  output: { name: 'companyName', schema: z.string() },
+  model: { alias: 'fast' },
+});
+```
 
 ### Methods
 

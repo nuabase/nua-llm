@@ -1,4 +1,3 @@
-import { CanonicalModelName, SUPPORTED_MODELS } from "../model-info";
 import {
   generateSpanId,
   logLlmCallComplete,
@@ -58,17 +57,16 @@ export class HttpLlmClient implements LlmClient {
 
   async sendRequest(
     prompt: string,
-    model: CanonicalModelName,
+    model: string,
     maxTokens: number,
     assistantPrefillPrompt?: string,
   ): Promise<ProviderParsedResponse> {
     const provider = this.getProviderConfig();
-    const providerModelName = this.getProviderModelName(model);
 
     const requestOptions = provider.buildRequest(
       {
         prompt,
-        model: providerModelName,
+        model,
         maxTokens,
         assistantPrefillPrompt,
       },
@@ -90,19 +88,18 @@ export class HttpLlmClient implements LlmClient {
   async sendAgenticRequest(
     messages: ConversationMessage[],
     tools: ToolDefinition[],
-    model: CanonicalModelName,
+    model: string,
     maxTokens: number,
     systemPrompt?: string,
     onEvent?: AgentEventHandler,
   ): Promise<AgenticParsedResponse> {
     const provider = this.getProviderConfig();
-    const providerModelName = this.getProviderModelName(model);
     const codec = this.getAgenticProviderCodec(provider.errorLabel);
 
     const requestOptions = codec.buildRequest({
       messages,
       tools,
-      model: providerModelName,
+      model,
       maxTokens,
       systemPrompt,
       stream: !!onEvent,
@@ -136,23 +133,9 @@ export class HttpLlmClient implements LlmClient {
     return provider;
   }
 
-  private getProviderModelName(model: CanonicalModelName): string {
-    const providerSpecificModelName = SUPPORTED_MODELS[model].find(
-      (pm) => pm.provider === this.providerId,
-    );
-
-    if (!providerSpecificModelName) {
-      throw new Error(
-        `LLM Provider ${this.providerId} does not support model ${model}. If this is an error and the provider does support this model, please contact us to fix it`,
-      );
-    }
-
-    return providerSpecificModelName.providerModelName;
-  }
-
   private async executeProviderCall<T>(params: {
     provider: ProviderConfig;
-    model: CanonicalModelName;
+    model: string;
     maxTokens: number;
     apiOperation: string;
     requestOptions: ProviderRequestBase;

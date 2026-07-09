@@ -1,172 +1,147 @@
 import { NuaValidationError } from "../../lib/nua-errors";
-import { LlmProviderId } from "../llm-client/provider-config";
+import {
+  LLM_PROVIDER_IDS,
+  LlmProviderId,
+} from "../llm-client/provider-config";
 
-export const CANONICAL_MODELS = [
-  "qwen3-30b-a3b-instruct-2507",
-  "claude-opus-4-7",
-  "claude-sonnet-4-6",
-  "claude-haiku-4-5",
-  "qwen3-vl-235b-a22b-instruct",
-  "qwen3-max",
-  "gpt-5",
-  "gemini-2.5-flash-lite",
-  "gemini-2.5-flash",
-  "qwen3-coder-flash",
-  "gpt-oss-120b",
-  "kimi-k2.5",
-  "kimi-k2.6",
-] as const;
-
-// 2) Type is derived from the array (no duplication)
-export type CanonicalModelName = (typeof CANONICAL_MODELS)[number];
-
-// 3) Fast lookup at runtime
-const CANONICAL_SET = new Set<string>(CANONICAL_MODELS);
-
-export type ProviderAndModel = {
+export type ProviderModel = {
   provider: LlmProviderId;
-  providerModelName: string;
+  model: string;
 };
 
-export const SUPPORTED_MODELS: Record<
-  CanonicalModelName,
-  Array<ProviderAndModel>
-> = {
-  "gpt-oss-120b": [
-    {
-      provider: "cerebras",
-      providerModelName: "gpt-oss-120b",
-    },
-    {
-      provider: "groq",
-      providerModelName: "openai/gpt-oss-120b",
-    },
-    {
-      provider: "openrouter",
-      providerModelName: "openai/gpt-oss-120b",
-    },
-  ],
-  "qwen3-30b-a3b-instruct-2507": [
-    {
-      provider: "openrouter",
-      providerModelName: "qwen/qwen3-30b-a3b-instruct-2507",
-    },
-  ],
-  "claude-opus-4-7": [
-    {
-      provider: "openrouter",
-      providerModelName: "anthropic/claude-opus-4.7",
-    },
-  ],
-  "claude-sonnet-4-6": [
-    {
-      provider: "openrouter",
-      providerModelName: "anthropic/claude-sonnet-4.6",
-    },
-  ],
-  "claude-haiku-4-5": [
-    {
-      provider: "openrouter",
-      providerModelName: "anthropic/claude-haiku-4.5",
-    },
-  ],
-  "qwen3-vl-235b-a22b-instruct": [
-    {
-      provider: "openrouter",
-      providerModelName: "qwen/qwen3-vl-235b-a22b-instruct",
-    },
-  ],
-  "qwen3-max": [
-    {
-      provider: "openrouter",
-      providerModelName: "qwen/qwen3-max",
-    },
-  ],
-  "gpt-5": [
-    {
-      provider: "openrouter",
-      providerModelName: "openai/gpt-5",
-    },
-  ],
-  "gemini-2.5-flash-lite": [
-    {
-      provider: "gemini",
-      providerModelName: "gemini-2.5-flash-lite",
-    },
-    {
-      provider: "openrouter",
-      providerModelName: "google/gemini-2.5-flash-lite",
-    },
-  ],
-  "gemini-2.5-flash": [
-    {
-      provider: "gemini",
-      providerModelName: "gemini-2.5-flash",
-    },
-    {
-      provider: "openrouter",
-      providerModelName: "google/gemini-2.5-flash",
-    },
-  ],
-  "qwen3-coder-flash": [
-    {
-      provider: "openrouter",
-      providerModelName: "qwen/qwen3-coder-flash",
-    },
-  ],
-  "kimi-k2.5": [
-    {
-      provider: "openrouter",
-      providerModelName: "moonshotai/kimi-k2.5",
-    },
-  ],
-  "kimi-k2.6": [
-    {
-      provider: "openrouter",
-      providerModelName: "moonshotai/kimi-k2.6",
-    },
-  ],
-} as const;
+export type ModelAliasName =
+  | "fast"
+  | "gemini"
+  | "qwen"
+  | "sonnet"
+  | "opus"
+  | "haiku"
+  | "kimi"
+  | "gpt";
 
-export function parseCanonicalModelName(
-  requestedModel: string | null | undefined,
-): CanonicalModelName | NuaValidationError {
-  let m = requestedModel || "fast";
-  if (CANONICAL_SET.has(m)) return m as CanonicalModelName;
+export type ModelInput = ProviderModel | { alias: ModelAliasName };
 
-  let m2: undefined | CanonicalModelName;
-  switch (m) {
-    case "fast":
-      // As per Cerebras docs, this is the fastest. https://inference-docs.cerebras.ai/models/overview
-      m2 = "gpt-oss-120b";
-      // m2 = "gemini-2.5-flash-lite";
-      break;
-    case "gemini":
-      m2 = "gemini-2.5-flash";
-      break;
-    case "qwen":
-      m2 = "qwen3-vl-235b-a22b-instruct";
-      break;
-    case "sonnet":
-      m2 = "claude-sonnet-4-6";
-      break;
-    case "opus":
-      m2 = "claude-opus-4-7";
-      break;
-    case "haiku":
-      m2 = "claude-haiku-4-5";
-      break;
-    case "kimi":
-      m2 = "kimi-k2.6";
-      break;
-    case "gpt":
-      m2 = "gpt-5";
-      break;
-  }
-  if (m2) return m2 as CanonicalModelName;
+export const MODEL_ALIASES: Record<ModelAliasName, ProviderModel[]> = {
+  fast: [
+    { provider: "cerebras", model: "gpt-oss-120b" },
+    { provider: "groq", model: "openai/gpt-oss-120b" },
+    { provider: "openrouter", model: "openai/gpt-oss-120b" },
+  ],
+  gemini: [
+    { provider: "gemini", model: "gemini-2.5-flash" },
+    { provider: "openrouter", model: "google/gemini-2.5-flash" },
+  ],
+  qwen: [
+    { provider: "openrouter", model: "qwen/qwen3-vl-235b-a22b-instruct" },
+  ],
+  sonnet: [
+    { provider: "openrouter", model: "anthropic/claude-sonnet-4.6" },
+  ],
+  opus: [
+    { provider: "openrouter", model: "anthropic/claude-opus-4.7" },
+  ],
+  haiku: [
+    { provider: "openrouter", model: "anthropic/claude-haiku-4.5" },
+  ],
+  kimi: [
+    { provider: "openrouter", model: "moonshotai/kimi-k2.6" },
+  ],
+  gpt: [
+    { provider: "openrouter", model: "openai/gpt-5" },
+  ],
+};
 
+export const MODEL_ALIAS_NAMES = Object.keys(
+  MODEL_ALIASES,
+) as ModelAliasName[];
+
+const MODEL_ALIAS_SET = new Set<string>(MODEL_ALIAS_NAMES);
+const LLM_PROVIDER_ID_SET = new Set<string>(LLM_PROVIDER_IDS);
+
+export function isLlmProviderId(value: unknown): value is LlmProviderId {
+  return typeof value === "string" && LLM_PROVIDER_ID_SET.has(value);
+}
+
+export function isModelAliasName(value: unknown): value is ModelAliasName {
+  return typeof value === "string" && MODEL_ALIAS_SET.has(value);
+}
+
+function validationError(message: string): NuaValidationError {
   return {
     kind: "validation-error",
-    message: `Invalid model name: ${m ?? "null/undefined"}`,
+    message,
   };
+}
+
+function validateProviderModel(
+  input: ProviderModel,
+  configuredProviders: ReadonlySet<LlmProviderId>,
+): ProviderModel | NuaValidationError {
+  if (!isLlmProviderId(input.provider)) {
+    return validationError(`Invalid LLM provider: ${String(input.provider)}`);
+  }
+
+  if (!configuredProviders.has(input.provider)) {
+    return validationError(
+      `LLM provider ${input.provider} is not configured. Please check your API keys.`,
+    );
+  }
+
+  if (typeof input.model !== "string") {
+    return validationError("model.model must be a string");
+  }
+
+  const model = input.model.trim();
+  if (!model) {
+    return validationError("model.model must be a non-empty string");
+  }
+
+  if (input.provider === "gemini" && model.startsWith("models/")) {
+    return validationError(
+      'Gemini model names must use bare model IDs, for example "gemini-2.5-flash", not "models/gemini-2.5-flash".',
+    );
+  }
+
+  return {
+    provider: input.provider,
+    model,
+  };
+}
+
+export function resolveModelInput(
+  input: ModelInput | null | undefined,
+  configuredProviders: ReadonlySet<LlmProviderId>,
+): ProviderModel | NuaValidationError {
+  if (input == null) {
+    return resolveModelInput({ alias: "fast" }, configuredProviders);
+  }
+
+  if (typeof input !== "object") {
+    return validationError("model must be an object with either alias or provider/model fields");
+  }
+
+  if ("provider" in input || "model" in input) {
+    return validateProviderModel(input as ProviderModel, configuredProviders);
+  }
+
+  if ("alias" in input) {
+    const alias = input.alias;
+    if (!isModelAliasName(alias)) {
+      return validationError(`Invalid model alias: ${String(alias)}`);
+    }
+
+    const configuredTarget = MODEL_ALIASES[alias].find((target) =>
+      configuredProviders.has(target.provider),
+    );
+
+    if (!configuredTarget) {
+      return validationError(
+        `No configured provider found for model alias ${alias}. Please check your API keys.`,
+      );
+    }
+
+    return configuredTarget;
+  }
+
+  return validationError("model must include either alias or provider/model fields");
 }

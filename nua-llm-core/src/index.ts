@@ -5,6 +5,7 @@ export * from "./lib/nua-errors";
 export { default as castPromptBuilder } from "./modules/prompt-builders/cast-prompt-builder";
 export { default as castArrayPromptBuilder } from "./modules/prompt-builders/cast-array-prompt-builder";
 export {
+  LLM_PROVIDER_IDS,
   normalizedUsageZero,
   providerConfigs,
 } from "./modules/llm-client/provider-config";

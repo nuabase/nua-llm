@@ -1,7 +1,6 @@
 import { ValidationResult } from "../json-schema-validation/nua-json-schema-value-validation";
 import { LlmClient } from "../llm-client/llm-client";
 import { NormalizedUsage } from "../llm-client/provider-config";
-import { CanonicalModelName } from "../model-info";
 import {
   parseJsonFromLlmResponse,
   extractThinkingFromResponse,
@@ -19,7 +18,7 @@ export type CallLlmResult = {
 export async function callLLM(
   llmClient: LlmClient,
   prompt: string,
-  model: CanonicalModelName,
+  model: string,
   maxTokens: number,
   temperature: number,
   maxRetries: number,

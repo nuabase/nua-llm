@@ -1,8 +1,9 @@
 import { CastArrayParams, CastResult, CastValueParams, LlmBackend, NormalizedUsage } from './types';
-import { LlmProviderId, NuaLlmClient, wrapArraySchema } from 'nua-llm-core';
+import { NuaLlmClient, wrapArraySchema } from 'nua-llm-core';
+import type { LlmProviderId, ModelInput } from 'nua-llm-core';
 
 export type DirectConfig = {
-  model: string;
+  model?: ModelInput;
   providers: {
     [key in LlmProviderId]?: { apiKey: string };
   };
@@ -16,12 +17,9 @@ const normalizedUsageZero: NormalizedUsage = {
 
 export class DirectBackend implements LlmBackend {
   private readonly client: NuaLlmClient;
-  private readonly model: string;
+  private readonly model: ModelInput | undefined;
 
   constructor(config: DirectConfig) {
-    if (!config.model) {
-      throw new Error('model is required for direct mode');
-    }
     this.model = config.model;
     this.client = new NuaLlmClient({ providers: config.providers });
   }
@@ -49,7 +47,7 @@ export class DirectBackend implements LlmBackend {
       success: true,
       data: result.data as T,
       usage: result.usage || normalizedUsageZero,
-      model,
+      model: formatModelInput(model),
       latencyMs,
       source: 'direct',
       meta: {},
@@ -84,10 +82,16 @@ export class DirectBackend implements LlmBackend {
       success: true,
       data: result.data as T[],
       usage: result.usage || normalizedUsageZero,
-      model,
+      model: formatModelInput(model),
       latencyMs,
       source: 'direct',
       meta: {},
     };
   }
+}
+
+function formatModelInput(model: ModelInput | undefined): string {
+  if (!model) return 'fast';
+  if ('alias' in model) return model.alias;
+  return `${model.provider}:${model.model}`;
 }

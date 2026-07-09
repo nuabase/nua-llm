@@ -1,4 +1,5 @@
 import { Nua } from '../../nua';
+import type { ModelInput } from 'nua-llm-core';
 
 export type TestMode = 'gateway' | 'direct';
 
@@ -31,8 +32,8 @@ export function createTestClient(mode: TestMode): Nua {
     envKey: string;
     defaultModel: string;
   }> = [
-    { provider: 'groq', envKey: 'GROQ_API_KEY', defaultModel: 'gpt-oss-120b' },
-    { provider: 'openrouter', envKey: 'OPENROUTER_API_KEY', defaultModel: 'kimi-k2.5' },
+    { provider: 'groq', envKey: 'GROQ_API_KEY', defaultModel: 'openai/gpt-oss-120b' },
+    { provider: 'openrouter', envKey: 'OPENROUTER_API_KEY', defaultModel: 'moonshotai/kimi-k2.5' },
     { provider: 'cerebras', envKey: 'CEREBRAS_API_KEY', defaultModel: 'gpt-oss-120b' },
     { provider: 'gemini', envKey: 'GEMINI_API_KEY', defaultModel: 'gemini-2.5-flash' },
   ];
@@ -40,8 +41,13 @@ export function createTestClient(mode: TestMode): Nua {
   for (const config of providerConfigs) {
     const apiKey = process.env[config.envKey];
     if (apiKey) {
-      return Nua.direct({
+      const model: ModelInput = {
+        provider: config.provider,
         model: process.env.TEST_LLM_MODEL || config.defaultModel,
+      };
+
+      return Nua.direct({
+        model,
         providers: {
           [config.provider]: { apiKey },
         },

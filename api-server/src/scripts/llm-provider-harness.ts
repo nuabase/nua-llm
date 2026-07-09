@@ -2,13 +2,13 @@
  * LLM Provider Harness
  *
  * Purpose:
- *   The script executes every configured canonical model / provider pairing and captures
+ *   The script executes alias targets and explicit provider/model pairings and captures
  *   the exact request and response payloads so that we can inspect the real-world
  *   response shapes before normalizing them. This lets us confidently switch between
  *   providers because we know the variability we need to normalize.
  *
  * How it works:
- *   - Discovers all canonical model/provider combinations from `SUPPORTED_MODELS`.
+ *   - Discovers alias/provider combinations from `MODEL_ALIASES`.
  *   - For each combination, it builds the HTTP request using the existing provider
  *     configs (reusing the same request builders/headers as production) and sends it.
  *   - Every result records start/end timestamps, HTTP status, request metadata,
@@ -21,12 +21,12 @@
  *   - Ensure the relevant API keys are set (e.g. `GROQ_API_KEY`, `CEREBRAS_API_KEY`,
  *     `OPENROUTER_API_KEY`, `GEMINI_API_KEY` for future Gemini support).
  *   - Execute `npm run llm:harness -- [options]`. Run with `--help` to see the CLI
- *     options for overriding prompt/max tokens, filtering models/providers, and setting
+ *     options for overriding prompt/max tokens, filtering aliases/providers, and setting
  *     the output file.
  *
  * Output outline:
  *   - `metadata`: prompt, filters, run timestamps, and output path.
- *   - `combinations`: which canonical model/provider pairs were attempted.
+ *   - `combinations`: which alias or explicit provider/model pairs were attempted.
  *   - `results`: per-combination entries containing status (`success`, `skipped`,
  *     `http-error`, `parse-error`, `request-error`), sanitized request info, raw
  *     response data, parsed JSON (if valid), provider-parsed text, and error metadata.
@@ -38,13 +38,12 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import {
-  CANONICAL_MODELS,
-  CanonicalModelName,
-  SUPPORTED_MODELS,
-} from "nua-llm-core";
-import {
+  MODEL_ALIASES,
+  MODEL_ALIAS_NAMES,
+  ModelAliasName,
   type NormalizedUsage,
   LlmProviderId,
+  ProviderModel,
   providerConfigs,
 } from "nua-llm-core";
 
@@ -67,13 +66,13 @@ type HarnessRunStatus =
   | "skipped";
 
 type ModelProviderCombination = {
-  canonicalModel: CanonicalModelName;
+  alias?: ModelAliasName;
   providerId: LlmProviderId;
   providerModelName: string;
 };
 
 type ProviderRunResult = {
-  canonicalModel: CanonicalModelName;
+  alias?: ModelAliasName;
   providerId: LlmProviderId;
   providerModelName: string;
   startedAt: string;
@@ -106,8 +105,9 @@ type HarnessRunMetadata = {
   assistantPrefillPrompt?: string;
   maxTokens: number;
   filters?: {
-    models?: CanonicalModelName[];
+    aliases?: ModelAliasName[];
     providers?: LlmProviderId[];
+    explicitModels?: ProviderModel[];
   };
   outputPath: string;
 };
@@ -122,8 +122,9 @@ export type RunHarnessOptions = {
   prompt?: string;
   assistantPrefillPrompt?: string;
   maxTokens?: number;
-  models?: CanonicalModelName[];
+  aliases?: ModelAliasName[];
   providers?: LlmProviderId[];
+  explicitModels?: ProviderModel[];
   outputPath?: string;
 };
 
@@ -131,8 +132,9 @@ type ResolvedHarnessOptions = {
   prompt: string;
   assistantPrefillPrompt?: string;
   maxTokens: number;
-  modelFilters?: Set<CanonicalModelName>;
+  aliasFilters?: Set<ModelAliasName>;
   providerFilters?: Set<LlmProviderId>;
+  explicitModels: ProviderModel[];
   outputPath: string;
 };
 
@@ -140,8 +142,8 @@ type CliParseResult = RunHarnessOptions & {
   showHelp?: boolean;
 };
 
-function isCanonicalModelName(value: string): value is CanonicalModelName {
-  return (CANONICAL_MODELS as readonly string[]).includes(value);
+function isModelAliasName(value: string): value is ModelAliasName {
+  return (MODEL_ALIAS_NAMES as readonly string[]).includes(value);
 }
 
 function isProviderId(value: string): value is LlmProviderId {
@@ -159,6 +161,7 @@ function splitListArg(value: string): string[] {
 
 function parseCliArgs(argv: string[]): CliParseResult {
   const overrides: CliParseResult = {};
+  let explicitModelName: string | undefined;
 
   for (let index = 0; index < argv.length; index++) {
     const arg = argv[index];
@@ -199,15 +202,26 @@ function parseCliArgs(argv: string[]): CliParseResult {
       case "--maxTokens":
         overrides.maxTokens = Number(readValue());
         break;
-      case "--model":
-      case "--models": {
-        const rawModels = splitListArg(readValue());
-        overrides.models = [
-          ...(overrides.models ?? []),
-          ...rawModels.filter(isCanonicalModelName),
+      case "--alias":
+      case "--aliases": {
+        const rawAliases = splitListArg(readValue());
+        overrides.aliases = [
+          ...(overrides.aliases ?? []),
+          ...rawAliases.filter(isModelAliasName),
         ];
         break;
       }
+      case "--models": {
+        const rawAliases = splitListArg(readValue());
+        overrides.aliases = [
+          ...(overrides.aliases ?? []),
+          ...rawAliases.filter(isModelAliasName),
+        ];
+        break;
+      }
+      case "--model":
+        explicitModelName = readValue().trim();
+        break;
       case "--provider":
       case "--providers": {
         const rawProviders = splitListArg(readValue());
@@ -227,6 +241,22 @@ function parseCliArgs(argv: string[]): CliParseResult {
     }
   }
 
+  if (explicitModelName) {
+    if (!overrides.providers || overrides.providers.length !== 1) {
+      throw new Error(
+        "--model requires exactly one --provider value for an explicit provider-native run",
+      );
+    }
+
+    overrides.explicitModels = [
+      ...(overrides.explicitModels ?? []),
+      {
+        provider: overrides.providers[0],
+        model: explicitModelName,
+      },
+    ];
+  }
+
   return overrides;
 }
 
@@ -242,8 +272,10 @@ function printCliHelp(): void {
       "  --prompt \"...\"                Override the default prompt.",
       "  --assistant-prefill \"...\"      Prefill an assistant response before the real call.",
       "  --max-tokens <number>          Max tokens to request (default 256).",
-      "  --models model1,model2         Only run for specific canonical models.",
-      "  --providers provider1,provider2 Only run for specific providers.",
+      "  --aliases alias1,alias2        Only run for specific aliases.",
+      "  --provider openrouter --model z-ai/glm-5.2",
+      "                                Run one explicit provider-native model.",
+      "  --providers provider1,provider2 Only run alias targets for specific providers.",
       "  --output ./path/to/file.json   Where to persist the run artifact (defaults to logs/).",
       "  --help                         Show this help text.",
       "",
@@ -270,9 +302,9 @@ function resolveHarnessOptions(
       `llm-harness-results-${timestamp}.json`,
     );
 
-  const modelFilters =
-    overrides.models && overrides.models.length > 0
-      ? new Set(overrides.models)
+  const aliasFilters =
+    overrides.aliases && overrides.aliases.length > 0
+      ? new Set(overrides.aliases)
       : undefined;
   const providerFilters =
     overrides.providers && overrides.providers.length > 0
@@ -286,8 +318,9 @@ function resolveHarnessOptions(
       typeof overrides.maxTokens === "number" && !Number.isNaN(overrides.maxTokens)
         ? overrides.maxTokens
         : DEFAULT_MAX_TOKENS,
-    modelFilters,
+    aliasFilters,
     providerFilters,
+    explicitModels: overrides.explicitModels ?? [],
     outputPath,
   };
 }
@@ -297,13 +330,26 @@ function collectCombinations(
 ): ModelProviderCombination[] {
   const combinations: ModelProviderCombination[] = [];
 
-  for (const canonicalModel of CANONICAL_MODELS) {
-    if (options.modelFilters && !options.modelFilters.has(canonicalModel)) {
+  for (const explicitModel of options.explicitModels) {
+    if (
+      options.providerFilters &&
+      !options.providerFilters.has(explicitModel.provider)
+    ) {
       continue;
     }
 
-    const providerEntries = SUPPORTED_MODELS[canonicalModel];
-    providerEntries.forEach((entry) => {
+    combinations.push({
+      providerId: explicitModel.provider,
+      providerModelName: explicitModel.model,
+    });
+  }
+
+  for (const alias of MODEL_ALIAS_NAMES) {
+    if (options.aliasFilters && !options.aliasFilters.has(alias)) {
+      continue;
+    }
+
+    MODEL_ALIASES[alias].forEach((entry) => {
       if (
         options.providerFilters &&
         !options.providerFilters.has(entry.provider)
@@ -312,9 +358,9 @@ function collectCombinations(
       }
 
       combinations.push({
-        canonicalModel,
+        alias,
         providerId: entry.provider,
-        providerModelName: entry.providerModelName,
+        providerModelName: entry.model,
       });
     });
   }
@@ -364,7 +410,7 @@ async function runCombination(
   if (!apiKey) {
     const finishedAt = new Date();
     return {
-      canonicalModel: combination.canonicalModel,
+      alias: combination.alias,
       providerId: combination.providerId,
       providerModelName: combination.providerModelName,
       startedAt: startedAt.toISOString(),
@@ -379,7 +425,7 @@ async function runCombination(
   if (!provider) {
     const finishedAt = new Date();
     return {
-      canonicalModel: combination.canonicalModel,
+      alias: combination.alias,
       providerId: combination.providerId,
       providerModelName: combination.providerModelName,
       startedAt: startedAt.toISOString(),
@@ -443,7 +489,7 @@ async function runCombination(
       : "http-error";
 
     return {
-      canonicalModel: combination.canonicalModel,
+      alias: combination.alias,
       providerId: combination.providerId,
       providerModelName: combination.providerModelName,
       startedAt: startedAt.toISOString(),
@@ -464,7 +510,7 @@ async function runCombination(
   } catch (error) {
     const finishedAt = new Date();
     return {
-      canonicalModel: combination.canonicalModel,
+      alias: combination.alias,
       providerId: combination.providerId,
       providerModelName: combination.providerModelName,
       startedAt: startedAt.toISOString(),
@@ -499,8 +545,9 @@ export async function runLlmProviderHarness(
     results.push(result);
     const statusLabel =
       result.status === "success" ? "✅" : result.status === "skipped" ? "⚪" : "⚠️";
+    const modelLabel = combination.alias ?? "explicit";
     console.log(
-      `${statusLabel} ${combination.canonicalModel} -> ${combination.providerId} (${combination.providerModelName}) - ${result.status}`,
+      `${statusLabel} ${modelLabel} -> ${combination.providerId} (${combination.providerModelName}) - ${result.status}`,
     );
   }
 
@@ -514,12 +561,13 @@ export async function runLlmProviderHarness(
       assistantPrefillPrompt: resolvedOptions.assistantPrefillPrompt,
       maxTokens: resolvedOptions.maxTokens,
       filters: {
-        models: resolvedOptions.modelFilters
-          ? Array.from(resolvedOptions.modelFilters.values())
+        aliases: resolvedOptions.aliasFilters
+          ? Array.from(resolvedOptions.aliasFilters.values())
           : undefined,
         providers: resolvedOptions.providerFilters
           ? Array.from(resolvedOptions.providerFilters.values())
           : undefined,
+        explicitModels: resolvedOptions.explicitModels,
       },
       outputPath: resolvedOptions.outputPath,
     },

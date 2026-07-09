@@ -1,9 +1,11 @@
+import type { ModelInput } from 'nua-llm-core';
+
 export type CastValueParams = {
   prompt: string;
   data: unknown;
   outputName: string;
   outputSchema: object;
-  model?: string;
+  model?: ModelInput;
 };
 
 export type CastArrayParams = {
@@ -12,7 +14,7 @@ export type CastArrayParams = {
   primaryKey: string;
   outputName: string;
   outputSchema: object;
-  model?: string;
+  model?: ModelInput;
 };
 
 export type NormalizedUsage = {

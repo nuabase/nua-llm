@@ -13,9 +13,10 @@ const client = new NuaLlmClient({
   logger: new ConsoleLogger(), // Optional: Inject your own logger
   providers: {
     // Provide keys for the models you intend to use
-    openai: { apiKey: process.env.OPENAI_API_KEY },
-    anthropic: { apiKey: process.env.ANTHROPIC_API_KEY },
     groq: { apiKey: process.env.GROQ_API_KEY },
+    cerebras: { apiKey: process.env.CEREBRAS_API_KEY },
+    openrouter: { apiKey: process.env.OPENROUTER_API_KEY },
+    gemini: { apiKey: process.env.GEMINI_API_KEY },
   },
 });
 ```
@@ -26,7 +27,7 @@ Extract a single structured object from natural language inputs.
 
 ```typescript
 const result = await client.castValue({
-  model: "fast", // or specific model names like "gpt-5", "gemini-2.5-flash"
+  model: { alias: "fast" }, // optional; omitted model also defaults to fast
   input: {
     prompt: "Extract the event details",
     data: "Join us for the Tech Conference on Dec 1st, 2025 at 10 AM.",
@@ -65,7 +66,7 @@ const rawData = [
 ];
 
 const result = await client.castArray({
-  model: "claude-sonnet-4-6",
+  model: { provider: "openrouter", model: "anthropic/claude-sonnet-4.6" },
   input: {
     prompt: "Convert price list to structured objects",
     primaryKey: "name", // Required for tracking and caching logic
@@ -100,14 +101,14 @@ if (result.success) {
 
 *   `logger`: Instance implementing the `Logger` interface (debug, info, warn, error). Defaults to `ConsoleLogger`.
 *   `providers`: Map of provider configuration.
-    *   Supported providers: `openai`, `anthropic`, `groq`, `cerebras`, `google` (gemini), `openrouter`.
+    *   Supported providers: `groq`, `cerebras`, `gemini`, `openrouter`.
     *   Currently requires `apiKey` for each used provider.
 
 ### `castValue<T>(params)`
 
 Performs a single LLM call to extract an object matching the schema.
 
-*   `model`: Canonical model name (e.g., `fast`, `quality`) or provider specific string.
+*   `model`: Optional typed model input. Use `{ alias: "fast" }` for a product alias, or `{ provider: "openrouter", model: "z-ai/glm-5.2" }` for a provider-native model. If omitted, `{ alias: "fast" }` is used.
 *   `input.prompt`: Instructions for the extraction.
 *   `input.data`: The context data (string or object) to process.
 *   `output.name`: Name of the entity (helps LLM context).

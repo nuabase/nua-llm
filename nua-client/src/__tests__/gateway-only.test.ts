@@ -94,7 +94,7 @@ describe('gateway-only features', () => {
     test('response and stored request both have specified model', async () => {
       const nua = Nua.gateway({});
       const headers = await getAuthHeaders();
-      const specifiedModel = 'claude-sonnet-4-6';
+      const specifiedModel = { provider: 'openrouter' as const, model: 'anthropic/claude-sonnet-4.6' };
 
       const response = await nua.get('Return the number 99', {
         output: {
@@ -108,7 +108,7 @@ describe('gateway-only features', () => {
       if (response.source !== 'gateway') throw new Error('expected gateway source');
 
       // Check response model matches
-      expect(response.model).toBe(specifiedModel);
+      expect(response.model).toBe(specifiedModel.model);
 
       // Retrieve the stored request and verify model
       const requestId = response.meta.requestId;
@@ -121,7 +121,8 @@ describe('gateway-only features', () => {
       expect(getResponse.ok).toBe(true);
 
       const requestData = await getResponse.json();
-      expect(requestData.model).toBe(specifiedModel);
+      expect(requestData.provider).toBe(specifiedModel.provider);
+      expect(requestData.model).toBe(specifiedModel.model);
     }, 30000);
   });
 
@@ -164,7 +165,7 @@ describe('gateway-only features', () => {
   test('model override returns specified model in response', async () => {
     const nua = Nua.gateway({});
     const NumberSchema = z.number();
-    const specifiedModel = 'claude-sonnet-4-6';
+    const specifiedModel = { provider: 'openrouter' as const, model: 'anthropic/claude-sonnet-4.6' };
 
     const response = await nua.get('Return the number 42', {
       output: {
@@ -176,6 +177,6 @@ describe('gateway-only features', () => {
 
     if (!response.success) throw new Error(`error in api response: ${response.error}`);
 
-    expect(response.model).toBe(specifiedModel);
+    expect(response.model).toBe(specifiedModel.model);
   }, 30000);
 });

@@ -5,7 +5,7 @@ import {
 } from "#modules/execute-llm-request/cast-array/cast-array-request-service";
 import { isNuaValidationError, NuaValidationError } from "nua-llm-core";
 import { CastArrayApiResponse_Success } from "#modules/execute-llm-request/types";
-import { CanonicalModelName } from "nua-llm-core";
+import { ProviderModel } from "nua-llm-core";
 import { LlmRequest, LlmRequestModel } from "../../../models/llm-request-model";
 import { NuaLlmClient, ConsoleLogger, normalizedUsageZero } from "nua-llm-core";
 import {  NormalizedUsage } from "nua-llm-core";
@@ -19,13 +19,16 @@ const nuaClient = new NuaLlmClient({
     cerebras: { apiKey: config.llm.cerebrasApiKey },
     groq: { apiKey: config.llm.groqApiKey },
     openrouter: { apiKey: config.llm.openRouterApiKey },
+    gemini: config.llm.geminiApiKey
+      ? { apiKey: config.llm.geminiApiKey }
+      : undefined,
   },
 });
 
 export async function executeCastArrayLlmRequest(
   llmRequest: LlmRequest,
   effectiveSchema: object,
-  model: CanonicalModelName,
+  model: ProviderModel,
 ): Promise<CastArrayApiResponse_Success> {
   // Get the parsed input data, which is an array of objects, with one property being primaryKey
   // Fingerprint each row.
@@ -99,7 +102,8 @@ export async function executeCastArrayLlmRequest(
     llmRequestId: llmRequest.id,
     kind: "cast/array",
     isSuccess: true,
-    model,
+    provider: model.provider,
+    model: model.model,
   } satisfies Partial<CastArrayApiResponse_Success>;
 
   // dataResponse includes data, rowsWithNoResults, cacheHits, and cacheUsage

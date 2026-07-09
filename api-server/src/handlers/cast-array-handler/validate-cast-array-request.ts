@@ -5,8 +5,8 @@ import {
 import { validateMappableInputData } from "#handlers/cast-array-handler/validate-mappable-input-data";
 import { validateCastValueRequestParams } from "#handlers/cast-value-handler/validate-cast-request";
 import { nullToUndefined } from "#lib/empty-utils";
-import { getErrorMessageFromException } from "#lib/error-utils";
 import { isNuaValidationError, NuaValidationError } from "nua-llm-core";
+import type { LlmProviderId } from "nua-llm-core";
 
 function resolvePrimaryKey(v: unknown): string | NuaValidationError {
   // default to 'id' if not provided
@@ -22,6 +22,7 @@ function resolvePrimaryKey(v: unknown): string | NuaValidationError {
 
 export const validateCastArrayRequestParams = (
   params: CastArrayRequestParams,
+  configuredProviders: ReadonlySet<LlmProviderId>,
 ):
   | Omit<ValidCastArrayRequestParams, "output.effectiveSchema">
   | NuaValidationError => {
@@ -29,7 +30,7 @@ export const validateCastArrayRequestParams = (
   const baseValidatedParams = validateCastValueRequestParams({
     ...params,
     kind: "cast-value-request-params",
-  });
+  }, configuredProviders);
 
   if (isNuaValidationError(baseValidatedParams)) return baseValidatedParams;
 

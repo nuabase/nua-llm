@@ -11,9 +11,9 @@ import { buildNuaJsonSchemaValueValidation } from "./modules/json-schema-validat
 import { HttpLlmClient } from "./modules/llm-client/http-llm-client";
 import { LlmProviderId, normalizedUsageZero } from "./modules/llm-client/provider-config";
 import {
-  CanonicalModelName,
-  parseCanonicalModelName,
-  SUPPORTED_MODELS,
+  ModelInput,
+  ProviderModel,
+  resolveModelInput,
 } from "./modules/model-info";
 import castArrayPromptBuilder from "./modules/prompt-builders/cast-array-prompt-builder";
 import castPromptBuilder from "./modules/prompt-builders/cast-prompt-builder";
@@ -61,43 +61,37 @@ export class NuaLlmClient {
     });
   }
 
-  private getClientForModel(model: CanonicalModelName): HttpLlmClient {
-    const supported = SUPPORTED_MODELS[model];
-    if (!supported || supported.length === 0) {
-      throw new Error(
-        `Model ${model} is not supported or configuration is missing.`,
-      );
-    }
-
-    // Simple strategy: pick the first supported provider that is configured
-    for (const option of supported) {
-      if (this.clients.has(option.provider)) {
-        return this.clients.get(option.provider)!;
-      }
-    }
-
-    throw new Error(
-      `No configured provider found for model ${model}. Please check your API keys.`,
-    );
+  private getConfiguredProviderIds(): Set<LlmProviderId> {
+    return new Set(this.clients.keys());
   }
 
-  private resolveModel(modelName: string): CanonicalModelName {
-    const result = parseCanonicalModelName(modelName);
+  private resolveModel(model: ModelInput | null | undefined): ProviderModel {
+    const result = resolveModelInput(model, this.getConfiguredProviderIds());
     if (isNuaValidationError(result)) {
       throw new Error(result.message);
     }
     return result;
   }
 
+  private getClientForProvider(provider: LlmProviderId): HttpLlmClient {
+    const client = this.clients.get(provider);
+    if (!client) {
+      throw new Error(
+        `LLM provider ${provider} is not configured. Please check your API keys.`,
+      );
+    }
+    return client;
+  }
+
   async castValue<T = unknown>(
     params: CastValuePromptInput & {
-      model: string;
+      model?: ModelInput;
       maxTokens?: number;
       temperature?: number;
     },
   ): Promise<CastResult<T>> {
-    const model = this.resolveModel(params.model);
-    const client = this.getClientForModel(model);
+    const providerModel = this.resolveModel(params.model);
+    const client = this.getClientForProvider(providerModel.provider);
     const maxTokens = params.maxTokens || 4096;
     const temperature = params.temperature ?? 0.0;
 
@@ -114,7 +108,7 @@ export class NuaLlmClient {
       const result = await callLLM(
         client,
         prompt,
-        model,
+        providerModel.model,
         maxTokens,
         temperature,
         3, // default retries
@@ -139,13 +133,13 @@ export class NuaLlmClient {
   async castArray<T = unknown>(
     params: CastArrayPromptInput & {
       data: unknown[];
-      model: string;
+      model?: ModelInput;
       maxTokens?: number;
       temperature?: number;
     },
   ): Promise<CastResult<T[]>> {
-    const model = this.resolveModel(params.model);
-    const client = this.getClientForModel(model);
+    const providerModel = this.resolveModel(params.model);
+    const client = this.getClientForProvider(providerModel.provider);
     const maxTokens = params.maxTokens || 4096;
     const temperature = params.temperature ?? 0.0;
 
@@ -193,7 +187,7 @@ export class NuaLlmClient {
       const result = await callLLM(
         client,
         prompt,
-        model,
+        providerModel.model,
         maxTokens,
         temperature,
         3,
@@ -218,8 +212,8 @@ export class NuaLlmClient {
 
   async runAgent(params: AgentRunParams): Promise<AgentResult> {
     try {
-      const model = this.resolveModel(params.model);
-      const client = this.getClientForModel(model);
+      const providerModel = this.resolveModel(params.model);
+      const client = this.getClientForProvider(providerModel.provider);
       const maxTokens = params.maxTokens ?? 4096;
       const maxTurns = params.maxTurns ?? 10;
 
@@ -233,7 +227,7 @@ export class NuaLlmClient {
           client.sendAgenticRequest(
             messages,
             tools,
-            model,
+            providerModel.model,
             maxTokens,
             systemPrompt,
             params.onEvent,

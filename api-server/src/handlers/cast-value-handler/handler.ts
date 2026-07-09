@@ -3,6 +3,7 @@ import { CastValueRequestParams } from "#handlers/cast-value-handler/cast-value-
 import { validateCastValueRequestParams } from "#handlers/cast-value-handler/validate-cast-request";
 import { sendUnauthorized_unlessUser } from "#handlers/user-request-gating";
 import { workerUtils } from "#lib/graphile-worker-utils";
+import { getConfiguredProviderIds } from "#lib/llm-providers";
 import { isNuaValidationError } from "nua-llm-core";
 import { buildSseUrl } from "#modules/execute-llm-request/build-sse-url";
 import executeLlmRequest from "#modules/execute-llm-request/execute-llm-request";
@@ -26,7 +27,10 @@ async function prepareCastRequest(
   if (!currentUser) return;
 
   // Validates params as well as the JSON Schema
-  const validParams = validateCastValueRequestParams(params);
+  const validParams = validateCastValueRequestParams(
+    params,
+    getConfiguredProviderIds(),
+  );
   if (isNuaValidationError(validParams)) {
     sendBadRequest(req, res, validParams.message);
     return null;

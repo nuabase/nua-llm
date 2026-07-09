@@ -1,19 +1,20 @@
 import { NuaLlmClient } from "../../nua-llm-client";
 import { AgentEvent, AgentTool } from "../../modules/agent/types";
 import { LlmProviderId } from "../../modules/llm-client/provider-config";
+import { ProviderModel } from "../../modules/model-info";
 
 const PROVIDER_TESTS: Array<{
   provider: LlmProviderId;
-  model: string;
+  model: ProviderModel;
   envKey: string;
 }> = [
-  { provider: "groq", model: "gpt-oss-120b", envKey: "GROQ_API_KEY" },
-  { provider: "cerebras", model: "gpt-oss-120b", envKey: "CEREBRAS_API_KEY" },
-  { provider: "gemini", model: "gemini-2.5-flash", envKey: "GEMINI_API_KEY" },
-  { provider: "openrouter", model: "kimi-k2.5", envKey: "OPENROUTER_API_KEY" },
-  { provider: "openrouter", model: "kimi-k2.6", envKey: "OPENROUTER_API_KEY" },
-  { provider: "openrouter", model: "claude-opus-4-7", envKey: "OPENROUTER_API_KEY" },
-  { provider: "openrouter", model: "claude-haiku-4-5", envKey: "OPENROUTER_API_KEY" },
+  { provider: "groq", model: { provider: "groq", model: "openai/gpt-oss-120b" }, envKey: "GROQ_API_KEY" },
+  { provider: "cerebras", model: { provider: "cerebras", model: "gpt-oss-120b" }, envKey: "CEREBRAS_API_KEY" },
+  { provider: "gemini", model: { provider: "gemini", model: "gemini-2.5-flash" }, envKey: "GEMINI_API_KEY" },
+  { provider: "openrouter", model: { provider: "openrouter", model: "moonshotai/kimi-k2.5" }, envKey: "OPENROUTER_API_KEY" },
+  { provider: "openrouter", model: { provider: "openrouter", model: "moonshotai/kimi-k2.6" }, envKey: "OPENROUTER_API_KEY" },
+  { provider: "openrouter", model: { provider: "openrouter", model: "anthropic/claude-opus-4.7" }, envKey: "OPENROUTER_API_KEY" },
+  { provider: "openrouter", model: { provider: "openrouter", model: "anthropic/claude-haiku-4.5" }, envKey: "OPENROUTER_API_KEY" },
 ];
 
 function makeLookupCapitalTool(): AgentTool {
@@ -40,7 +41,7 @@ for (const { provider, model, envKey } of PROVIDER_TESTS) {
   const apiKey = process.env[envKey];
   const describeFn = apiKey ? describe : describe.skip;
 
-  describeFn(`${provider} — ${model}`, () => {
+  describeFn(`${provider} — ${model.model}`, () => {
     let client: NuaLlmClient;
 
     beforeAll(() => {

@@ -9,7 +9,14 @@ export type ProviderRequestBase = {
   loggableBody?: unknown;
 };
 
-export type LlmProviderId = "groq" | "cerebras" | "gemini" | "openrouter";
+export const LLM_PROVIDER_IDS = [
+  "groq",
+  "cerebras",
+  "gemini",
+  "openrouter",
+] as const;
+
+export type LlmProviderId = (typeof LLM_PROVIDER_IDS)[number];
 
 export interface ProviderRequestOptions {
   prompt: string;

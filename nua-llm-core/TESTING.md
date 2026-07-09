@@ -18,12 +18,12 @@ Hits real LLM endpoints. Requires API keys set as environment variables. Tests t
 
 ### Environment variables
 
-| Provider    | Model              | Env Var              |
-|-------------|--------------------|----------------------|
-| Groq        | `gpt-oss-120b`     | `GROQ_API_KEY`       |
-| Cerebras    | `gpt-oss-120b`     | `CEREBRAS_API_KEY`   |
-| Gemini      | `gemini-2.5-flash` | `GEMINI_API_KEY`     |
-| OpenRouter  | `kimi-k2.5`        | `OPENROUTER_API_KEY` |
+| Provider    | Provider-native model     | Env Var              |
+|-------------|---------------------------|----------------------|
+| Groq        | `openai/gpt-oss-120b`     | `GROQ_API_KEY`       |
+| Cerebras    | `gpt-oss-120b`            | `CEREBRAS_API_KEY`   |
+| Gemini      | `gemini-2.5-flash`        | `GEMINI_API_KEY`     |
+| OpenRouter  | `moonshotai/kimi-k2.5`    | `OPENROUTER_API_KEY` |
 
 Tests for providers without a configured API key are automatically skipped.
 

@@ -1,4 +1,4 @@
-import { CanonicalModelName } from "nua-llm-core";
+import type { ModelInput, ProviderModel } from "nua-llm-core";
 
 export type CastValueRequestParams = {
   kind: "cast-value-request-params";
@@ -17,7 +17,7 @@ export type CastValueRequestParams = {
   options?: {
     invalidateCache?: boolean | null | undefined;
   } | null;
-  model?: string | null;
+  model?: ModelInput | null;
 };
 
 export type ValidCastValueRequestParams = {
@@ -40,5 +40,5 @@ export type ValidCastValueRequestParams = {
   options: {
     invalidateCache: boolean;
   };
-  model: CanonicalModelName;
+  model: ProviderModel;
 };

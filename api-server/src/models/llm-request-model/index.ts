@@ -2,11 +2,13 @@ import { ValidCastArrayRequestParams } from "#handlers/cast-array-handler/cast-a
 import { ValidCastValueRequestParams } from "#handlers/cast-value-handler/cast-value-request.type";
 import { dbLlmMain } from "#lib/db";
 import { getErrorMessageFromException } from "#lib/error-utils";
+import { getConfiguredProviderIds } from "#lib/llm-providers";
 import { isNuaValidationError } from "nua-llm-core";
 import { NuaJobHelpers } from "#modules/execute-llm-request/execute-llm-request";
 import {
-  CanonicalModelName,
-  parseCanonicalModelName,
+  isLlmProviderId,
+  ProviderModel,
+  resolveModelInput,
 } from "nua-llm-core";
 import { Knex } from "knex";
 import { User } from "../users-model";
@@ -124,11 +126,11 @@ export class LlmRequestModel {
       sse_status: sseRequestStatus,
       error: null,
       result: null,
-      model: reqParams.model,
+      model: reqParams.model.model,
       max_tokens: 8192,
       temperature: 0.7,
       max_retries: 2,
-      provider: "openrouter",
+      provider: reqParams.model.provider,
       invalidate_cache: reqParams.options.invalidateCache,
       started_at: null,
       finished_at: null,
@@ -177,7 +179,7 @@ export class LlmRequestModel {
   ): Promise<{
     llmRequest: LlmRequest;
     effectiveSchema: object;
-    model: CanonicalModelName;
+    model: ProviderModel;
   } | null> {
     const llmRequest = await this.findById(id, user);
     if (!llmRequest) {
@@ -195,12 +197,28 @@ export class LlmRequestModel {
       return null;
     }
 
-    const model = parseCanonicalModelName(llmRequest.model);
-    if (isNuaValidationError(model)) {
-      const message = `unexpected-situation. Not processing job because LLM request with id ${id} has an invalid model: ${llmRequest.model}`;
+    let model: ProviderModel;
+    const configuredProviders = getConfiguredProviderIds();
+    const persistedProviderModel = isLlmProviderId(llmRequest.provider)
+      ? resolveModelInput(
+        {
+          provider: llmRequest.provider,
+          model: llmRequest.model,
+        },
+        configuredProviders,
+      )
+      : {
+        kind: "validation-error" as const,
+        message: `Invalid LLM provider: ${llmRequest.provider}`,
+      };
+
+    if (isNuaValidationError(persistedProviderModel)) {
+      const message = `unexpected-situation. Not processing job because LLM request with id ${id} has an invalid provider/model: ${llmRequest.provider}/${llmRequest.model}. ${persistedProviderModel.message}`;
       helpers.logger.error(message);
       return null; // no retry
     }
+
+    model = persistedProviderModel;
 
     await this.update(llmRequest.id, {
       llm_status: "processing",

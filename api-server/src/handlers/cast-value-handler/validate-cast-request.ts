@@ -4,11 +4,13 @@ import {
 } from "#handlers/cast-value-handler/cast-value-request.type";
 import { nullToUndefined_forObject } from "#lib/empty-utils";
 import { isNuaValidationError, NuaValidationError } from "nua-llm-core";
+import type { LlmProviderId } from "nua-llm-core";
 import { validateJsonSchema } from "nua-llm-core";
-import { parseCanonicalModelName } from "nua-llm-core";
+import { resolveModelInput } from "nua-llm-core";
 
 export const validateCastValueRequestParams = (
   params: CastValueRequestParams,
+  configuredProviders: ReadonlySet<LlmProviderId>,
 ): ValidCastValueRequestParams | NuaValidationError => {
   const { input, output } = params;
 
@@ -41,7 +43,7 @@ export const validateCastValueRequestParams = (
   const notifications: ValidCastValueRequestParams["notify"] =
     nullToUndefined_forObject(params["notify"]);
 
-  const model = parseCanonicalModelName(params.model);
+  const model = resolveModelInput(params.model, configuredProviders);
   if (isNuaValidationError(model)) {
     return model;
   }
