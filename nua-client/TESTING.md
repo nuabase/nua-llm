@@ -21,6 +21,7 @@ SKIP_GATEWAY_TESTS=1 GROQ_API_KEY=YOUR_KEY pnpm jest
 ## Direct Mode Providers
 
 Direct mode requires one of these API keys:
+
 - `GROQ_API_KEY`
 - `OPENROUTER_API_KEY`
 - `CEREBRAS_API_KEY`

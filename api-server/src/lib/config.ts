@@ -50,7 +50,10 @@ export const config = {
   dbLlmMainUrl: process.env.DB_LLM_MAIN_URL as string,
   dbConsoleMainUrl: process.env.DB_CONSOLE_MAIN_URL as string,
 
-  encryptionKeyDbStorageSigningKey: Buffer.from(process.env.ENCRYPTION_KEY_DB_STORAGE_SIGNING_KEY as string, "base64"),
+  encryptionKeyDbStorageSigningKey: Buffer.from(
+    process.env.ENCRYPTION_KEY_DB_STORAGE_SIGNING_KEY as string,
+    "base64",
+  ),
 };
 
 // if (!config.jwt.secretKey) {
@@ -81,7 +84,7 @@ validateRequiredConfigProperties([
   "sseJwt.secretKey",
   "sseJwt.issuer",
   "sseJwt.audience",
-  "encryptionKeyDbStorageSigningKey"
+  "encryptionKeyDbStorageSigningKey",
 ]);
 
 function validateRequiredConfigProperties(

@@ -8,7 +8,7 @@ import { CastArrayApiResponse_Success } from "#modules/execute-llm-request/types
 import { ProviderModel } from "nua-llm-core";
 import { LlmRequest, LlmRequestModel } from "../../../models/llm-request-model";
 import { NuaLlmClient, ConsoleLogger, normalizedUsageZero } from "nua-llm-core";
-import {  NormalizedUsage } from "nua-llm-core";
+import { NormalizedUsage } from "nua-llm-core";
 import { ArrayCacheService } from "nua-llm-caching";
 import { MappableInputDataRow } from "#handlers/cast-array-handler/validate-mappable-input-data";
 
@@ -46,8 +46,12 @@ export async function executeCastArrayLlmRequest(
   // This preserves the order of the original data.
   // Return result.filter(outputName is defined).
 
-  const cacheServiceOrError: NuaValidationError | ArrayCacheService<MappableInputDataRow> =
-    await initializeCastArrayCache(llmRequest, effectiveSchema);
+  const cacheServiceOrError:
+    | NuaValidationError
+    | ArrayCacheService<MappableInputDataRow> = await initializeCastArrayCache(
+    llmRequest,
+    effectiveSchema,
+  );
   if (isNuaValidationError(cacheServiceOrError)) {
     throw new Error(
       `unexpected-situation. Invalid data stored in llm record. ${cacheServiceOrError.message}`,
@@ -61,7 +65,9 @@ export async function executeCastArrayLlmRequest(
     llmOutputMappedRows = [];
     usage = normalizedUsageZero;
     const table = new LlmRequestModel();
-    await table.update(llmRequest.id, { full_prompt: "//# All rows served from cache" });
+    await table.update(llmRequest.id, {
+      full_prompt: "//# All rows served from cache",
+    });
   } else {
     const params = {
       model,
@@ -78,7 +84,13 @@ export async function executeCastArrayLlmRequest(
       },
     };
 
-    const { data, usage: resultUsage, success, error, prompt } = await nuaClient.castArray(params);
+    const {
+      data,
+      usage: resultUsage,
+      success,
+      error,
+      prompt,
+    } = await nuaClient.castArray(params);
 
     // Save the prompt regardless of success/failure so we can reproduce errors
     if (prompt) {

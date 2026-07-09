@@ -34,9 +34,9 @@ const signingKeysModel = new SigningKeysModel();
 
 export type FrontendJwtDecodeResult = { jwtExpired: boolean | undefined } & (
   | {
-    userId: string;
-    endConsumerId: string | null;
-  }
+      userId: string;
+      endConsumerId: string | null;
+    }
   | NuaValidationError
 );
 
@@ -44,7 +44,7 @@ export async function decodeFrontendJWT(
   rawToken: string,
 ): Promise<FrontendJwtDecodeResult> {
   // uv = unvalidated
-  let uvPayload: JWTPayload | undefined
+  let uvPayload: JWTPayload | undefined;
 
   try {
     uvPayload = decodeJwt(rawToken);

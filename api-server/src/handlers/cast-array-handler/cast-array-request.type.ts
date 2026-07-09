@@ -34,11 +34,11 @@ export type ValidCastArrayRequestParams = {
     effectiveSchema: object;
   };
   notify:
-  | {
-    metadata: object | undefined;
-    webhookUrl: string | undefined;
-  }
-  | undefined;
+    | {
+        metadata: object | undefined;
+        webhookUrl: string | undefined;
+      }
+    | undefined;
   options: {
     invalidateCache: boolean;
   };

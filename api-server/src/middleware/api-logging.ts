@@ -26,7 +26,13 @@ export function apiLogging(service: string) {
     // Completion log on finish
     res.on("finish", () => {
       const duration = req.ctx?.elapsedMs ? req.ctx.elapsedMs() : 0;
-      logApiCallComplete(spanId, service, routeLabel, { status: res.statusCode }, duration);
+      logApiCallComplete(
+        spanId,
+        service,
+        routeLabel,
+        { status: res.statusCode },
+        duration,
+      );
     });
 
     next();

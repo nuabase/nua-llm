@@ -6,17 +6,17 @@ import {
 import { getErrorMessageFromException } from "#lib/error-utils";
 import { cacheStore } from "#lib/cacheStore";
 import { ArrayCacheService } from "nua-llm-caching";
-import {
-  isNuaValidationError,
-  NuaValidationError,
-} from "nua-llm-core";
+import { isNuaValidationError, NuaValidationError } from "nua-llm-core";
 import { LlmRequest } from "../../../models/llm-request-model";
 import { UserDataPKValue } from "#modules/execute-llm-request/types";
 
 // This is the general type for the effective schema we wrap below.
 // Each row here will always have the values of the [primaryKeyName] and [outputName]
 // parameters as their only 2 properties. But since they're dynamic, we can't type it.
-export type MappedLlmOutputEffectiveSchemaRow = Record<UserDataPKValue, unknown>;
+export type MappedLlmOutputEffectiveSchemaRow = Record<
+  UserDataPKValue,
+  unknown
+>;
 
 export async function initializeCastArrayCache(
   llmRequest: LlmRequest,

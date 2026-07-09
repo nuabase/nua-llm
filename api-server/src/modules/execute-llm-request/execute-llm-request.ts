@@ -82,7 +82,9 @@ const executeLlmRequest = async (
     const finishedAt = new Date();
     const success = isSuccessResponse(response);
     const successResponse = success
-      ? (response as CastArrayApiResponse_Success | CastValueApiResponse_Success)
+      ? (response as
+          | CastArrayApiResponse_Success
+          | CastValueApiResponse_Success)
       : undefined;
     const usage: NormalizedUsage | undefined = successResponse?.llmUsage;
     const cacheUsage: NormalizedUsage | undefined = successResponse?.cacheUsage;

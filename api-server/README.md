@@ -1,7 +1,7 @@
 ## Usage
 
 ```
-bin/dev 
+bin/dev
 ```
 
 ## Model Inputs

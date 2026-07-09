@@ -27,10 +27,13 @@ export const validateCastArrayRequestParams = (
   | Omit<ValidCastArrayRequestParams, "output.effectiveSchema">
   | NuaValidationError => {
   // All validations that apply to cast request applies here. So let's do that first.
-  const baseValidatedParams = validateCastValueRequestParams({
-    ...params,
-    kind: "cast-value-request-params",
-  }, configuredProviders);
+  const baseValidatedParams = validateCastValueRequestParams(
+    {
+      ...params,
+      kind: "cast-value-request-params",
+    },
+    configuredProviders,
+  );
 
   if (isNuaValidationError(baseValidatedParams)) return baseValidatedParams;
 

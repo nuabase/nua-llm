@@ -12,6 +12,7 @@ npm run test
 ## Running the Server
 
 `npm run dev` uses hivemind to run 3 processes in parallel:
+
 - TypeScript compiler in watch mode
 - Express server with Node --watch (waits 8s for initial build)
 - Graphile job queue worker

@@ -3,7 +3,10 @@
 // Load the *exact same* key, decoded from Base64
 import * as crypto from "crypto";
 
-export function decryptRailsMessageEncryptor(payload: string, encryptionKey: Buffer): string | null {
+export function decryptRailsMessageEncryptor(
+  payload: string,
+  encryptionKey: Buffer,
+): string | null {
   try {
     const [encryptedDataB64, ivB64, authTagB64] = payload.split("--");
     if (!encryptedDataB64 || !ivB64 || !authTagB64) {
@@ -25,7 +28,10 @@ export function decryptRailsMessageEncryptor(payload: string, encryptionKey: Buf
     decipher.setAuthTag(authTag);
 
     // Decrypt the data
-    const decryptedBuffer = Buffer.concat([decipher.update(encryptedData), decipher.final()]);
+    const decryptedBuffer = Buffer.concat([
+      decipher.update(encryptedData),
+      decipher.final(),
+    ]);
     const decrypted = decryptedBuffer.toString("utf8");
 
     // 7. Success! Parse and return the value.

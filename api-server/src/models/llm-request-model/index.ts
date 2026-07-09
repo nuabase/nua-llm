@@ -64,16 +64,20 @@ export type UpdateLlmRequest = Partial<
 type CreateParams =
   | { requestType: "cast/value"; reqParams: ValidCastValueRequestParams }
   | {
-    requestType: "cast/array";
-    reqParams: ValidCastArrayRequestParams;
-  };
+      requestType: "cast/array";
+      reqParams: ValidCastArrayRequestParams;
+    };
 
 export class LlmRequestModel {
   private db: Knex = dbLlmMain;
 
-  constructor() { }
+  constructor() {}
 
-  async create(user: User, endConsumerId: string | null, createParams: CreateParams): Promise<LlmRequest> {
+  async create(
+    user: User,
+    endConsumerId: string | null,
+    createParams: CreateParams,
+  ): Promise<LlmRequest> {
     const { requestType, reqParams } = createParams;
     const now = new Date();
 
@@ -201,16 +205,16 @@ export class LlmRequestModel {
     const configuredProviders = getConfiguredProviderIds();
     const persistedProviderModel = isLlmProviderId(llmRequest.provider)
       ? resolveModelInput(
-        {
-          provider: llmRequest.provider,
-          model: llmRequest.model,
-        },
-        configuredProviders,
-      )
+          {
+            provider: llmRequest.provider,
+            model: llmRequest.model,
+          },
+          configuredProviders,
+        )
       : {
-        kind: "validation-error" as const,
-        message: `Invalid LLM provider: ${llmRequest.provider}`,
-      };
+          kind: "validation-error" as const,
+          message: `Invalid LLM provider: ${llmRequest.provider}`,
+        };
 
     if (isNuaValidationError(persistedProviderModel)) {
       const message = `unexpected-situation. Not processing job because LLM request with id ${id} has an invalid provider/model: ${llmRequest.provider}/${llmRequest.model}. ${persistedProviderModel.message}`;

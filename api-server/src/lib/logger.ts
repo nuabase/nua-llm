@@ -1,9 +1,5 @@
 import winston from "winston";
-import {
-  generateSpanId,
-  pickHeaders,
-  normalizeError,
-} from "nua-llm-core";
+import { generateSpanId, pickHeaders, normalizeError } from "nua-llm-core";
 
 // Pretty format for development
 function formatValue(value: any, indent = 0) {
@@ -157,7 +153,11 @@ export const logApiCallStart = (
     method,
     request: {
       ...rest,
-      headers: pickHeaders(headers, API_REQUEST_HEADER_ALLOWLIST, REDACTED_HEADERS),
+      headers: pickHeaders(
+        headers,
+        API_REQUEST_HEADER_ALLOWLIST,
+        REDACTED_HEADERS,
+      ),
       ...bodySize(body),
     },
   });

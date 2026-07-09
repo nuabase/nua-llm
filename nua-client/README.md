@@ -146,33 +146,33 @@ Every call returns a discriminated union. When `success` is `false`, you get an 
 
 **Success**
 
-| Field       | Type                                                      | Description                                             |
-| ----------- | --------------------------------------------------------- | ------------------------------------------------------- |
-| `success`   | `true`                                                    | Indicates that the request completed successfully.      |
-| `data`      | `T` (for `get`) or `Array<{ [pk]: value; [output]: T }>` (for `list`) | The typed result matching your schema.    |
-| `usage`     | `{ promptTokens, completionTokens, totalTokens }`         | Token usage statistics for the LLM request.             |
-| `model`     | `string`                                                  | The LLM model used for this request.                    |
-| `latencyMs` | `number`                                                  | Request latency in milliseconds.                        |
-| `source`    | `'gateway'` \| `'direct'`                                 | Which backend processed the request.                    |
-| `meta`      | `object`                                                  | Additional metadata (varies by source).                 |
+| Field       | Type                                                                  | Description                                        |
+| ----------- | --------------------------------------------------------------------- | -------------------------------------------------- |
+| `success`   | `true`                                                                | Indicates that the request completed successfully. |
+| `data`      | `T` (for `get`) or `Array<{ [pk]: value; [output]: T }>` (for `list`) | The typed result matching your schema.             |
+| `usage`     | `{ promptTokens, completionTokens, totalTokens }`                     | Token usage statistics for the LLM request.        |
+| `model`     | `string`                                                              | The LLM model used for this request.               |
+| `latencyMs` | `number`                                                              | Request latency in milliseconds.                   |
+| `source`    | `'gateway'` \| `'direct'`                                             | Which backend processed the request.               |
+| `meta`      | `object`                                                              | Additional metadata (varies by source).            |
 
 **Gateway-specific metadata** (`meta` when `source` is `'gateway'`):
 
-| Field        | Type      | Description                                    |
-| ------------ | --------- | ---------------------------------------------- |
-| `requestId`  | `string`  | Unique identifier for tracing.                 |
-| `cached`     | `boolean` | Whether the result was served from cache.      |
-| `llmUsage`   | `object`  | Token usage from LLM calls.                    |
-| `cacheUsage` | `object`  | Token usage served from cache.                 |
+| Field        | Type      | Description                               |
+| ------------ | --------- | ----------------------------------------- |
+| `requestId`  | `string`  | Unique identifier for tracing.            |
+| `cached`     | `boolean` | Whether the result was served from cache. |
+| `llmUsage`   | `object`  | Token usage from LLM calls.               |
+| `cacheUsage` | `object`  | Token usage served from cache.            |
 
 **Error**
 
-| Field       | Type                          | Description                                              |
-| ----------- | ----------------------------- | -------------------------------------------------------- |
-| `success`   | `false`                       | Indicates the request failed.                            |
-| `error`     | `string`                      | Message describing the error.                            |
-| `source`    | `'gateway'` \| `'direct'`     | Which backend returned the error.                        |
-| `latencyMs` | `number`                      | Time until failure in milliseconds.                      |
+| Field       | Type                      | Description                         |
+| ----------- | ------------------------- | ----------------------------------- |
+| `success`   | `false`                   | Indicates the request failed.       |
+| `error`     | `string`                  | Message describing the error.       |
+| `source`    | `'gateway'` \| `'direct'` | Which backend returned the error.   |
+| `latencyMs` | `number`                  | Time until failure in milliseconds. |
 
 ## SDK API
 
@@ -210,7 +210,7 @@ await nua.get('Extract the company name', {
 Returns a simple string response from the LLM.
 
 ```ts
-const result = await nua.get("Tell me a joke");
+const result = await nua.get('Tell me a joke');
 if (result.success) console.log(result.data); // string
 ```
 
@@ -222,8 +222,8 @@ Returns a typed single value. Parameters:
 - `options.output: { name: string; schema: ZodSchema }` – Output name and Zod schema.
 
 ```ts
-const result = await nua.get("Extract the address", {
-  input: "123 Main St, Springfield, IL 62701",
+const result = await nua.get('Extract the address', {
+  input: '123 Main St, Springfield, IL 62701',
   output: { name: 'address', schema: AddressSchema },
 });
 if (result.success) console.log(result.data); // typed as z.infer<typeof AddressSchema>
@@ -238,20 +238,20 @@ Processes an array of items. Parameters:
 - `options.output: { name: string; schema: ZodSchema }` – Output configuration.
 
 ```ts
-const result = await nua.list("Classify each lead", {
+const result = await nua.list('Classify each lead', {
   input: leads,
   primaryKey: 'id',
   output: { name: 'classification', schema: ClassificationSchema },
 });
 if (result.success) {
-  result.data.forEach(row => console.log(row.id, row.classification));
+  result.data.forEach((row) => console.log(row.id, row.classification));
 }
 ```
 
-**`nua.queueGet(prompt, options?)`** *(Gateway mode only)*
+**`nua.queueGet(prompt, options?)`** _(Gateway mode only)_
 Submits an async job for single-value operations. Returns `{ success: true, jobId }`.
 
-**`nua.queueList(prompt, options)`** *(Gateway mode only)*
+**`nua.queueList(prompt, options)`** _(Gateway mode only)_
 Submits an async job for array operations. Returns `{ success: true, jobId }`.
 
 ## Next Steps

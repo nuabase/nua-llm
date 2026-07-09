@@ -32,11 +32,11 @@ export type ValidCastValueRequestParams = {
     data: unknown;
   };
   notify:
-  | {
-    metadata: object | undefined;
-    webhookUrl: string | undefined;
-  }
-  | undefined;
+    | {
+        metadata: object | undefined;
+        webhookUrl: string | undefined;
+      }
+    | undefined;
   options: {
     invalidateCache: boolean;
   };

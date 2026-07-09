@@ -269,8 +269,8 @@ function printCliHelp(): void {
       "  npm run llm:harness -- [options]",
       "",
       "Options:",
-      "  --prompt \"...\"                Override the default prompt.",
-      "  --assistant-prefill \"...\"      Prefill an assistant response before the real call.",
+      '  --prompt "..."                Override the default prompt.',
+      '  --assistant-prefill "..."      Prefill an assistant response before the real call.',
       "  --max-tokens <number>          Max tokens to request (default 256).",
       "  --aliases alias1,alias2        Only run for specific aliases.",
       "  --provider openrouter --model z-ai/glm-5.2",
@@ -297,10 +297,10 @@ function resolveHarnessOptions(
   const outputPath = overrides.outputPath
     ? path.resolve(process.cwd(), overrides.outputPath)
     : path.resolve(
-      process.cwd(),
-      "logs",
-      `llm-harness-results-${timestamp}.json`,
-    );
+        process.cwd(),
+        "logs",
+        `llm-harness-results-${timestamp}.json`,
+      );
 
   const aliasFilters =
     overrides.aliases && overrides.aliases.length > 0
@@ -315,7 +315,8 @@ function resolveHarnessOptions(
     prompt: overrides.prompt ?? DEFAULT_PROMPT,
     assistantPrefillPrompt: overrides.assistantPrefillPrompt,
     maxTokens:
-      typeof overrides.maxTokens === "number" && !Number.isNaN(overrides.maxTokens)
+      typeof overrides.maxTokens === "number" &&
+      !Number.isNaN(overrides.maxTokens)
         ? overrides.maxTokens
         : DEFAULT_MAX_TOKENS,
     aliasFilters,
@@ -544,7 +545,11 @@ export async function runLlmProviderHarness(
     const result = await runCombination(combination, resolvedOptions);
     results.push(result);
     const statusLabel =
-      result.status === "success" ? "✅" : result.status === "skipped" ? "⚪" : "⚠️";
+      result.status === "success"
+        ? "✅"
+        : result.status === "skipped"
+          ? "⚪"
+          : "⚠️";
     const modelLabel = combination.alias ?? "explicit";
     console.log(
       `${statusLabel} ${modelLabel} -> ${combination.providerId} (${combination.providerModelName}) - ${result.status}`,
@@ -577,7 +582,8 @@ export async function runLlmProviderHarness(
 
   await persistArtifact(artifact, resolvedOptions.outputPath);
   console.log(
-    `Saved ${results.length} result(s) to ${resolvedOptions.outputPath}. Successes: ${results.filter((r) => r.status === "success").length
+    `Saved ${results.length} result(s) to ${resolvedOptions.outputPath}. Successes: ${
+      results.filter((r) => r.status === "success").length
     }, skipped: ${results.filter((r) => r.status === "skipped").length}`,
   );
 
