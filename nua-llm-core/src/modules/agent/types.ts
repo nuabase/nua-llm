@@ -1,4 +1,4 @@
-import { NormalizedUsage } from "../llm-client/provider-config";
+import { NormalizedUsage } from "../engine/http/provider-config";
 import { ModelInput } from "../model-info";
 
 // --- Tool Types ---

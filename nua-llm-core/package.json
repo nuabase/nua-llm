@@ -5,6 +5,23 @@
   "packageManager": "pnpm@10.20.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./local-agent": {
+      "types": "./dist/local-agent.d.ts",
+      "default": "./dist/local-agent.js"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "local-agent": [
+        "dist/local-agent.d.ts"
+      ]
+    }
+  },
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",

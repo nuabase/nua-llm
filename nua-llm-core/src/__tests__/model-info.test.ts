@@ -1,6 +1,6 @@
 import { isNuaValidationError } from "../lib/nua-errors";
 import { resolveModelInput } from "../modules/model-info";
-import { LlmProviderId } from "../modules/llm-client/provider-config";
+import { LlmProviderId } from "../modules/engine/http/provider-config";
 
 const configured = (...providers: LlmProviderId[]) => new Set(providers);
 
@@ -87,5 +87,4 @@ describe("resolveModelInput", () => {
       expect(result.message).toContain("bare model IDs");
     }
   });
-
 });

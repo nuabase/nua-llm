@@ -1,97 +1,87 @@
-import { CastArrayParams, CastResult, CastValueParams, LlmBackend, NormalizedUsage } from './types';
-import { NuaLlmClient, wrapArraySchema } from 'nua-llm-core';
-import type { LlmProviderId, ModelInput } from 'nua-llm-core';
+import { CastArrayParams, CastResult, CastValueParams, LlmBackend } from './types';
+import { listSchema, NuaLlmClient, providerEngines } from 'nua-llm-core';
+import type {
+  AnswerOrigin,
+  CastResult as CoreCastResult,
+  EngineRouter,
+  JsonSchema,
+  LlmProviderId,
+  ModelInput,
+} from 'nua-llm-core';
+import type { LocalAgent } from 'nua-llm-core/local-agent';
 
-export type DirectConfig = {
-  model?: ModelInput;
-  providers: {
-    [key in LlmProviderId]?: { apiKey: string };
-  };
+/** API keys for the LLM providers direct mode may call. */
+export type ProviderApiKeys = {
+  [key in LlmProviderId]?: { apiKey: string };
 };
 
-const normalizedUsageZero: NormalizedUsage = {
-  promptTokens: 0,
-  completionTokens: 0,
-  totalTokens: 0,
-};
+/**
+ * Either `providers`: API keys for LLM providers, with an optional default `model`.
+ * Or `localAgent`: a coding-agent CLI on this machine, from `localAgent()` or
+ * `findLocalAgent()` in "nuabase/local-agent".
+ */
+export type DirectConfig =
+  | { providers: ProviderApiKeys; model?: ModelInput; localAgent?: never }
+  | { localAgent: LocalAgent; providers?: never; model?: never };
 
 export class DirectBackend implements LlmBackend {
   private readonly client: NuaLlmClient;
-  private readonly model: ModelInput | undefined;
 
   constructor(config: DirectConfig) {
-    this.model = config.model;
-    this.client = new NuaLlmClient({ providers: config.providers });
+    this.client = new NuaLlmClient(enginesFor(config));
   }
 
   async castValue<T>(params: CastValueParams): Promise<CastResult<T>> {
-    const model = params.model ?? this.model;
     const startTime = Date.now();
-    const result = await this.client.castValue({
-      model,
+    const result = await this.client.castValue<T>({
+      model: params.model,
       input: { prompt: params.prompt, data: params.data },
-      output: { name: params.outputName, effectiveSchema: params.outputSchema },
+      output: { name: params.outputName, schema: params.outputSchema },
     });
-    const latencyMs = Date.now() - startTime;
-
-    if (!result.success) {
-      return {
-        success: false,
-        error: result.error || 'Unknown error',
-        source: 'direct',
-        latencyMs,
-      };
-    }
-
-    return {
-      success: true,
-      data: result.data as T,
-      usage: result.usage || normalizedUsageZero,
-      model: formatModelInput(model),
-      latencyMs,
-      source: 'direct',
-      meta: {},
-    };
+    return toDirectResult(result, Date.now() - startTime);
   }
 
   async castArray<T>(params: CastArrayParams): Promise<CastResult<T[]>> {
-    const model = params.model ?? this.model;
     const startTime = Date.now();
-    const wrappedSchema = wrapArraySchema(params.outputSchema as Record<string, unknown>, {
-      primaryKey: params.primaryKey,
-      outputName: params.outputName,
+    const result = await this.client.castArray<T>({
+      model: params.model,
+      input: { prompt: params.prompt, data: params.data },
+      output: listSchema(params.outputSchema as JsonSchema, {
+        primaryKey: params.primaryKey,
+        outputName: params.outputName,
+      }),
     });
-    const result = await this.client.castArray({
-      model,
-      data: params.data,
-      input: { prompt: params.prompt, primaryKey: params.primaryKey },
-      output: { name: params.outputName, effectiveSchema: wrappedSchema },
-    });
-    const latencyMs = Date.now() - startTime;
-
-    if (!result.success) {
-      return {
-        success: false,
-        error: result.error || 'Unknown error',
-        source: 'direct',
-        latencyMs,
-      };
-    }
-
-    return {
-      success: true,
-      data: result.data as T[],
-      usage: result.usage || normalizedUsageZero,
-      model: formatModelInput(model),
-      latencyMs,
-      source: 'direct',
-      meta: {},
-    };
+    return toDirectResult(result, Date.now() - startTime);
   }
 }
 
-function formatModelInput(model: ModelInput | undefined): string {
-  if (!model) return 'fast';
-  if ('alias' in model) return model.alias;
-  return `${model.provider}:${model.model}`;
+function enginesFor(config: DirectConfig): EngineRouter {
+  if (config.localAgent) {
+    return config.localAgent;
+  }
+  return providerEngines({ providers: config.providers, model: config.model });
+}
+
+function toDirectResult<T>(result: CoreCastResult<T>, latencyMs: number): CastResult<T> {
+  if (!result.success) {
+    return { success: false, error: result.error, source: 'direct', latencyMs };
+  }
+  return {
+    success: true,
+    data: result.data,
+    usage: result.usage,
+    model: describeModel(result.origin),
+    latencyMs,
+    source: 'direct',
+    meta: { ...result.origin, schemaEnforcement: result.schemaEnforcement },
+  };
+}
+
+function describeModel(origin: AnswerOrigin): string {
+  switch (origin.engine) {
+    case 'http':
+      return `${origin.provider}:${origin.model}`;
+    case 'local-agent':
+      return `${origin.agent}:${origin.model ?? 'default'}`;
+  }
 }

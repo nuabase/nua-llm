@@ -11,10 +11,12 @@ export type {
   NormalizedUsage,
   GatewayMeta,
   DirectMeta,
+  CastResultSource,
   QueueResult,
 } from './backend/types';
 export type { GatewayConfig } from './backend/gateway';
-export type { DirectConfig } from './backend/direct';
+export type { DirectConfig, ProviderApiKeys } from './backend/direct';
+export type { AnswerOrigin, LocalAgentId, ModelInput, SchemaEnforcementKind } from 'nua-llm-core';
 
 // Re-export zod for convenience
 export { z } from 'zod';

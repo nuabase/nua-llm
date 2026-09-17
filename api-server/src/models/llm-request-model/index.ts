@@ -12,7 +12,6 @@ import {
 } from "nua-llm-core";
 import { Knex } from "knex";
 import { User } from "../users-model";
-import { castArrayPromptBuilder, castPromptBuilder } from "nua-llm-core";
 
 /* Mapped to the llm_requests table in console/db/llm_main_schema.rb */
 export type LlmRequestStatus = "pending" | "processing" | "success" | "failed";
@@ -89,27 +88,8 @@ export class LlmRequestModel {
     // We always publish SSE events to a channel, whether there is someone listening or not.
     const sseRequestStatus: SseRequestStatus = "pending";
 
-    let systemPrompt, fullPrompt, primaryKey;
-    switch (requestType) {
-      case "cast/value": {
-        const { buildSystemPrompt, buildFullPrompt } = castPromptBuilder;
-        systemPrompt = buildSystemPrompt(reqParams);
-        fullPrompt = buildFullPrompt(reqParams);
-        break;
-      }
-      case "cast/array": {
-        const { buildSystemPrompt, buildFullPrompt } = castArrayPromptBuilder;
-        primaryKey = reqParams.input.primaryKey;
-        systemPrompt = buildSystemPrompt(primaryKey, reqParams.output.name);
-        fullPrompt = ""; // We're not going to save the full prompt for mapped requests, because if some rows have
-        // cache hit, we will exclude them from the LLM request. So we'll save the prompt only after the request is made.
-        break;
-      }
-      default: {
-        const _exhaustive: never = requestType;
-        throw new Error(`Unhandled request type: ${_exhaustive}`);
-      }
-    }
+    const primaryKey =
+      requestType === "cast/array" ? reqParams.input.primaryKey : null;
 
     const requestData: Omit<LlmRequest, "id"> = {
       user_id: user.id,
@@ -119,12 +99,14 @@ export class LlmRequestModel {
       input_data: reqParams.input.data
         ? JSON.stringify(reqParams.input.data)
         : null,
-      input_primary_key: primaryKey || null,
+      input_primary_key: primaryKey,
       output_name: reqParams.output.name,
       output_schema: JSON.stringify(reqParams.output.schema),
       output_effective_schema: JSON.stringify(reqParams.output.effectiveSchema),
-      system_prompt: systemPrompt,
-      full_prompt: fullPrompt,
+      // Saved after the LLM call, from the prompt that was actually sent. Nothing
+      // has been sent yet.
+      system_prompt: "",
+      full_prompt: "",
       llm_status: "pending",
       webhook_status: webhookRequestStatus,
       sse_status: sseRequestStatus,

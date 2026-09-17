@@ -37,6 +37,23 @@
         "types": "./dist/types/index.d.cts",
         "default": "./dist/cjs/index.cjs"
       }
+    },
+    "./local-agent": {
+      "import": {
+        "types": "./dist/types/local-agent.d.mts",
+        "default": "./dist/esm/local-agent.mjs"
+      },
+      "require": {
+        "types": "./dist/types/local-agent.d.cts",
+        "default": "./dist/cjs/local-agent.cjs"
+      }
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "local-agent": [
+        "./dist/types/local-agent.d.cts"
+      ]
     }
   },
   "peerDependencies": {
@@ -45,7 +62,7 @@
   "scripts": {
     "clean": "rimraf dist",
     "generate-dts": "tsx scripts/generate-dts",
-    "build": "rollup -c rollup.config.js && pnpm run generate-dts",
+    "build": "pnpm run clean && rollup -c rollup.config.js && pnpm run generate-dts",
     "pack:test": "tsx scripts/pack-test",
     "prettier:check": "prettier --check \"**/*.{ts,tsx}\"",
     "prettier:write": "prettier --write \"**/*.{ts,tsx}\"",

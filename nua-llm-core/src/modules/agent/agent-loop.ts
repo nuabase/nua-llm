@@ -7,7 +7,7 @@ import {
   ConversationMessage,
   ToolCallContent,
 } from "./types";
-import { NormalizedUsage, normalizedUsageZero } from "../llm-client/provider-config";
+import { NormalizedUsage, normalizedUsageZero } from "../engine/http/provider-config";
 
 export type SendAgenticRequestFn = (
   messages: ConversationMessage[],

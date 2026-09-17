@@ -1,6 +1,7 @@
-import { NuaLlmClient } from "../../nua-llm-client";
+import { runAgent } from "../../modules/agent/run-agent";
 import { AgentEvent, AgentTool } from "../../modules/agent/types";
-import { LlmProviderId } from "../../modules/llm-client/provider-config";
+import { LlmProviderId } from "../../modules/engine/http/provider-config";
+import { ProviderEngines, providerEngines } from "../../modules/engine/http/provider-engines";
 import { ProviderModel } from "../../modules/model-info";
 
 const PROVIDER_TESTS: Array<{
@@ -42,10 +43,10 @@ for (const { provider, model, envKey } of PROVIDER_TESTS) {
   const describeFn = apiKey ? describe : describe.skip;
 
   describeFn(`${provider} — ${model.model}`, () => {
-    let client: NuaLlmClient;
+    let providers: ProviderEngines;
 
     beforeAll(() => {
-      client = new NuaLlmClient({
+      providers = providerEngines({
         providers: {
           [provider]: { apiKey: apiKey! },
         },
@@ -53,7 +54,7 @@ for (const { provider, model, envKey } of PROVIDER_TESTS) {
     });
 
     it("completes a simple text conversation", async () => {
-      const result = await client.runAgent({
+      const result = await runAgent(providers, {
         model,
         messages: [
           { role: "user", content: "What is the capital of France? Reply with just the city name." },
@@ -70,7 +71,7 @@ for (const { provider, model, envKey } of PROVIDER_TESTS) {
     it("executes a tool and uses the result", async () => {
       const tool = makeLookupCapitalTool();
 
-      const result = await client.runAgent({
+      const result = await runAgent(providers, {
         model,
         systemPrompt: "You have access to a lookup_capital tool. Use it to answer questions about capital cities. Always use the tool rather than answering from memory.",
         messages: [
@@ -94,7 +95,7 @@ for (const { provider, model, envKey } of PROVIDER_TESTS) {
       const events: AgentEvent[] = [];
       const tool = makeLookupCapitalTool();
 
-      const result = await client.runAgent({
+      const result = await runAgent(providers, {
         model,
         systemPrompt: "You have access to a lookup_capital tool. Use it to answer questions about capital cities. Always use the tool rather than answering from memory.",
         messages: [

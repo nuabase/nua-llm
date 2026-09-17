@@ -7,10 +7,26 @@ import esbuild from 'rollup-plugin-esbuild';
 import nodeExternals from 'rollup-plugin-node-externals';
 
 export default {
-  input: path.join(process.cwd(), './src/index.ts'),
+  // Two entry points: "nuabase", which must load in browsers, and the Node-only
+  // "nuabase/local-agent", which runs coding-agent CLIs. Code both use goes into
+  // shared chunks.
+  input: {
+    index: path.join(process.cwd(), './src/index.ts'),
+    'local-agent': path.join(process.cwd(), './src/local-agent.ts'),
+  },
   output: [
-    { format: 'es', file: './dist/esm/index.mjs' },
-    { format: 'cjs', file: './dist/cjs/index.cjs' },
+    {
+      format: 'es',
+      dir: './dist/esm',
+      entryFileNames: '[name].mjs',
+      chunkFileNames: 'chunks/[name]-[hash].mjs',
+    },
+    {
+      format: 'cjs',
+      dir: './dist/cjs',
+      entryFileNames: '[name].cjs',
+      chunkFileNames: 'chunks/[name]-[hash].cjs',
+    },
   ],
   // Plugin order matters. Rollup runs each plugin's resolveId/load/transform
   // hooks in the order listed here, so the pipeline for a file like
@@ -39,14 +55,15 @@ export default {
     nodeExternals({
       // `exclude` here means "do NOT treat as external" — i.e. bundle it.
       //
-      // - nua-llm-core: not published to npm, so consumers cannot resolve it
-      //   at runtime; it must be inlined.
+      // - nua-llm-core (and its "nua-llm-core/local-agent" entry point): not
+      //   published to npm, so consumers cannot resolve it at runtime; it must
+      //   be inlined.
       // - ajv: must be bundled so @rollup/plugin-json can inline its
       //   meta-schema JSON files (see the plugin-order comment above).
       //   Leaving ajv external would put bare `import ... from
       //   'ajv/dist/refs/json-schema-draft-07.json'` statements in the ESM
       //   output, which Node 24 refuses to load without an import attribute.
-      exclude: ['nua-llm-core', 'ajv'],
+      exclude: [/^nua-llm-core(\/.*)?$/, 'ajv'],
     }),
     nodeResolve({ extensions: ['.ts', '.tsx', '.js', '.jsx'] }),
     esbuild({

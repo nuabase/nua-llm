@@ -2,7 +2,7 @@ import { NuaValidationError } from "../../lib/nua-errors";
 import {
   LLM_PROVIDER_IDS,
   LlmProviderId,
-} from "../llm-client/provider-config";
+} from "../engine/http/provider-config";
 
 export type ProviderModel = {
   provider: LlmProviderId;

@@ -1,24 +1,31 @@
 import { config } from "#lib/config";
 import { cacheStore } from "#lib/cacheStore";
 import { ValueCacheService } from "nua-llm-caching";
-import { NuaLlmClient, ConsoleLogger, normalizedUsageZero } from "nua-llm-core";
+import {
+  NuaLlmClient,
+  ConsoleLogger,
+  normalizedUsageZero,
+  providerEngines,
+} from "nua-llm-core";
 import { CastValueApiResponse_Success } from "#modules/execute-llm-request/types";
 import { ProviderModel } from "nua-llm-core";
 import { LlmRequest, LlmRequestModel } from "../../../models/llm-request-model";
 
 // Helper to get initialized client (singleton-like or per-request if logging context needed)
 // For now, we reuse the config logic.
-const nuaClient = new NuaLlmClient({
-  logger: new ConsoleLogger(),
-  providers: {
-    cerebras: { apiKey: config.llm.cerebrasApiKey },
-    groq: { apiKey: config.llm.groqApiKey },
-    openrouter: { apiKey: config.llm.openRouterApiKey },
-    gemini: config.llm.geminiApiKey
-      ? { apiKey: config.llm.geminiApiKey }
-      : undefined,
-  },
-});
+const nuaClient = new NuaLlmClient(
+  providerEngines({
+    logger: new ConsoleLogger(),
+    providers: {
+      cerebras: { apiKey: config.llm.cerebrasApiKey },
+      groq: { apiKey: config.llm.groqApiKey },
+      openrouter: { apiKey: config.llm.openRouterApiKey },
+      gemini: config.llm.geminiApiKey
+        ? { apiKey: config.llm.geminiApiKey }
+        : undefined,
+    },
+  }),
+);
 
 export async function executeCastValueLlmRequest(
   llmRequest: LlmRequest,
@@ -52,6 +59,10 @@ export async function executeCastValueLlmRequest(
   if (!llmRequest.invalidate_cache) {
     const cached = await cache.get();
     if (cached.hit) {
+      const table = new LlmRequestModel();
+      await table.update(llmRequest.id, {
+        full_prompt: "//# Served from cache",
+      });
       return {
         ...baseResponse,
         data: cached.value,
@@ -62,39 +73,34 @@ export async function executeCastValueLlmRequest(
     }
   }
 
-  const params = {
+  const result = await nuaClient.castValue({
     model,
     maxTokens: llmRequest.max_tokens,
-    temperature: llmRequest.temperature,
     input: {
       prompt: llmRequest.input_prompt || "",
       data: inputData,
     },
     output: {
       name: llmRequest.output_name,
-      effectiveSchema,
+      schema: effectiveSchema,
     },
-  };
+  });
 
-  const {
-    data: transformedResult,
-    usage,
-    success,
-    error,
-    prompt: fullPrompt,
-  } = await nuaClient.castValue(params);
-
-  // Save the prompt regardless of success/failure so we can reproduce errors
-  if (fullPrompt) {
+  // Save the prompt that was sent, regardless of success/failure, so we can reproduce errors
+  if (result.prompt) {
     const table = new LlmRequestModel();
-    await table.update(llmRequest.id, { full_prompt: fullPrompt });
+    await table.update(llmRequest.id, {
+      system_prompt: result.prompt.system,
+      full_prompt: result.prompt.full,
+    });
   }
 
-  if (!success || !transformedResult) {
-    throw new Error(`Cast value failed: ${error}`);
+  if (!result.success) {
+    throw new Error(`Cast value failed: ${result.error}`);
   }
 
-  const actualUsage = usage || normalizedUsageZero;
+  const transformedResult = result.data;
+  const actualUsage = result.usage;
 
   // Store result with usage in cache
   await cache.set(transformedResult, actualUsage);

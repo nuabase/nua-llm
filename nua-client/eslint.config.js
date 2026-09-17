@@ -5,7 +5,7 @@ import tseslint from 'typescript-eslint';
 export default tseslint.config(
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
-  { ignores: ['**/*.js', '**/*.cjs', '**/*.mjs', '**/*.d.mts', '**/*.d.cts'] },
+  { ignores: ['dist/**', '**/*.js', '**/*.cjs', '**/*.mjs', '**/*.d.mts', '**/*.d.cts'] },
   {
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',

@@ -7,7 +7,7 @@ import {
   normalizedUsageZero,
   OpenAiUsage,
   ProviderRequestBase,
-} from "../llm-client/provider-config";
+} from "../engine/http/provider-config";
 import {
   AgentEventHandler,
   AgenticParsedResponse,

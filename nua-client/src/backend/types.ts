@@ -1,4 +1,4 @@
-import type { ModelInput } from 'nua-llm-core';
+import type { AnswerOrigin, ModelInput, SchemaEnforcementKind } from 'nua-llm-core';
 
 export type CastValueParams = {
   prompt: string;
@@ -31,9 +31,13 @@ export type GatewayMeta = {
   cacheUsage: NormalizedUsage;
 };
 
-// Direct mode has no additional metadata beyond the common fields (model, latencyMs, usage).
-// Gateway mode has request tracking and caching infrastructure that Direct mode lacks.
-export type DirectMeta = unknown;
+// Direct mode runs the cast in this process, on an LLM provider's API or a coding agent on this machine.
+export type DirectMeta = AnswerOrigin & {
+  /** How the output schema was enforced. The result is validated against the schema either way. */
+  schemaEnforcement: SchemaEnforcementKind;
+};
+
+export type CastResultSource = 'gateway' | 'direct';
 
 // Success result with discriminated union on 'source'
 type CastResultSuccess<T> = {
@@ -47,7 +51,7 @@ type CastResultSuccess<T> = {
 type CastResultFailure = {
   success: false;
   error: string;
-  source: 'gateway' | 'direct';
+  source: CastResultSource;
   latencyMs: number;
 };
 

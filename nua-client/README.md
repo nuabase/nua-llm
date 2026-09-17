@@ -165,6 +165,16 @@ Every call returns a discriminated union. When `success` is `false`, you get an 
 | `llmUsage`   | `object`  | Token usage from LLM calls.               |
 | `cacheUsage` | `object`  | Token usage served from cache.            |
 
+**Direct-specific metadata** (`meta` when `source` is `'direct'`):
+
+| Field               | Type                         | Description                                                                                               |
+| ------------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `engine`            | `'http'` \| `'local-agent'`  | Whether an LLM provider's API or a coding agent on this machine answered.                                 |
+| `schemaEnforcement` | `'in-prompt'` \| `'native'`  | Whether the schema was described in the prompt or enforced by the engine. Output is validated either way. |
+| `provider`          | `string`                     | `engine: 'http'` only. The LLM provider.                                                                  |
+| `agent`             | `'claude-code'` \| `'codex'` | `engine: 'local-agent'` only. Which coding agent answered.                                                |
+| `costUsdEstimate`   | `number \| undefined`        | `engine: 'local-agent'` only. The agent's own estimate. On a subscription this is not what you pay.       |
+
 **Error**
 
 | Field       | Type                      | Description                         |
@@ -185,10 +195,12 @@ Creates a client that connects to the Nuabase API gateway. Use this for producti
 - `baseUrl?: string` – Override the API host. Defaults to `https://api.nuabase.com`.
 
 **`Nua.direct(config)`**
-Creates a client that calls LLM providers directly (in-process). Use this for serverless, edge functions, or CLI tools where you don't need the gateway infrastructure.
+Creates a client that runs casts in this process instead of through the gateway. Use this for serverless, edge functions, or CLI tools where you don't need the gateway infrastructure. It runs on one of two kinds of engine, chosen by the config.
 
-- `model?: ModelInput` – Optional default model. Omit it to use `{ alias: 'fast' }`.
+With API keys for LLM providers:
+
 - `providers: { groq?: { apiKey: string }, cerebras?: { apiKey: string }, gemini?: { apiKey: string }, openrouter?: { apiKey: string } }` – Provider credentials.
+- `model?: ModelInput` – Optional default model. Omit it to use `{ alias: 'fast' }`.
 
 Model inputs are objects, not provider-prefixed strings:
 
@@ -203,6 +215,45 @@ await nua.get('Extract the company name', {
   model: { alias: 'fast' },
 });
 ```
+
+With a coding agent on this machine (Node.js only):
+
+- `localAgent: LocalAgent` – Created with `localAgent()` or `findLocalAgent()` from `nuabase/local-agent`.
+
+```ts
+import { Nua } from 'nuabase';
+import { detectLocalAgents, findLocalAgent, localAgent } from 'nuabase/local-agent';
+
+const nua = Nua.direct({ localAgent: localAgent({ agent: 'claude-code', model: 'haiku' }) });
+
+// Or use the first agent that is installed and logged in:
+const auto = Nua.direct({ localAgent: await findLocalAgent() });
+
+const agents = await detectLocalAgents();
+// [{ agent: 'claude-code', installed: true, loggedIn: true, version: '...', binaryPath: '...' }, ...]
+```
+
+This runs a coding-agent CLI already installed and logged in on this machine, in its headless mode (`claude -p` or `codex exec`). Calls use the user's own Claude or ChatGPT subscription, so no API key is needed. `get()` and `list()` behave as with providers: the output is validated against your schema and typed the same way. Queue operations are not supported. `nuabase/local-agent` is a separate entry point so that browser bundles of `nuabase` never include it.
+
+The agent is set up once, when you create it. If you install an agent or log in after that, create a new one.
+
+**`localAgent(config)`** sets up a named agent. It throws right away if the agent's executable cannot be found; if the agent is not logged in, the first call fails with that error.
+
+- `agent: 'claude-code' | 'codex'`
+- `binaryPath?: string` – Path to the agent executable. Defaults to looking it up on `PATH`. On Windows, point this at a native executable; `.cmd` shims are not supported.
+- and the options below.
+
+**`findLocalAgent(options?)`** returns a promise of the first agent that is installed and logged in, trying Claude Code first. It rejects when there is none. Checking runs each CLI's version and login-status commands, which make no model calls.
+
+Options for both:
+
+- `model?: string` – The agent's own model name, e.g. `'haiku'` for Claude Code, for calls that name no model. Defaults to the agent's default. Per-call `model: { alias }` works for aliases the agent understands (`haiku`, `sonnet`, `opus` for Claude Code).
+- `timeoutMs?: number` – Per-call limit. Defaults to `180000`.
+- `concurrency?: number` – Maximum agent processes at once. Defaults to `2`.
+- `auth?: 'subscription' | 'inherit'` – `subscription` (default) hides `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` and similar variables from the agent so it bills the logged-in plan rather than an API key.
+- `logger?` – An object with `debug`, `info`, `warn` and `error` methods, where calls and retries are logged. Defaults to the console.
+
+How it works: each call runs the agent in a fresh, empty temporary directory with its tools, project settings and MCP servers turned off. The schema is wrapped as `{ value: ... }` (the agents require an object at the top level) and passed to the agent's own schema option. Codex only accepts OpenAI strict-mode schemas, so a schema with optional properties or open-ended objects is instead described in the prompt, and the output is validated as usual. If an agent rejects a schema, the call is retried with the schema in the prompt. `maxTokens` has no CLI equivalent and is ignored. Calls count against the user's plan limits; check each vendor's terms before offering this to other users.
 
 ### Methods
 

@@ -7,23 +7,31 @@ import { isNuaValidationError, NuaValidationError } from "nua-llm-core";
 import { CastArrayApiResponse_Success } from "#modules/execute-llm-request/types";
 import { ProviderModel } from "nua-llm-core";
 import { LlmRequest, LlmRequestModel } from "../../../models/llm-request-model";
-import { NuaLlmClient, ConsoleLogger, normalizedUsageZero } from "nua-llm-core";
+import {
+  NuaLlmClient,
+  ConsoleLogger,
+  normalizedUsageZero,
+  parseListSchema,
+  providerEngines,
+} from "nua-llm-core";
 import { NormalizedUsage } from "nua-llm-core";
 import { ArrayCacheService } from "nua-llm-caching";
 import { MappableInputDataRow } from "#handlers/cast-array-handler/validate-mappable-input-data";
 
 // Helper to get initialized client (singleton-like or per-request if logging context needed)
-const nuaClient = new NuaLlmClient({
-  logger: new ConsoleLogger(),
-  providers: {
-    cerebras: { apiKey: config.llm.cerebrasApiKey },
-    groq: { apiKey: config.llm.groqApiKey },
-    openrouter: { apiKey: config.llm.openRouterApiKey },
-    gemini: config.llm.geminiApiKey
-      ? { apiKey: config.llm.geminiApiKey }
-      : undefined,
-  },
-});
+const nuaClient = new NuaLlmClient(
+  providerEngines({
+    logger: new ConsoleLogger(),
+    providers: {
+      cerebras: { apiKey: config.llm.cerebrasApiKey },
+      groq: { apiKey: config.llm.groqApiKey },
+      openrouter: { apiKey: config.llm.openRouterApiKey },
+      gemini: config.llm.geminiApiKey
+        ? { apiKey: config.llm.geminiApiKey }
+        : undefined,
+    },
+  }),
+);
 
 export async function executeCastArrayLlmRequest(
   llmRequest: LlmRequest,
@@ -46,11 +54,23 @@ export async function executeCastArrayLlmRequest(
   // This preserves the order of the original data.
   // Return result.filter(outputName is defined).
 
+  // The list schema stored when the request was created. The cache fingerprint and the
+  // LLM call both use this one value, so they cannot disagree.
+  const listSchema = parseListSchema(effectiveSchema, {
+    primaryKey: llmRequest.input_primary_key ?? "",
+    outputName: llmRequest.output_name,
+  });
+  if (isNuaValidationError(listSchema)) {
+    throw new Error(
+      `unexpected-situation. Invalid list schema stored in llm record. ${listSchema.message}`,
+    );
+  }
+
   const cacheServiceOrError:
     | NuaValidationError
     | ArrayCacheService<MappableInputDataRow> = await initializeCastArrayCache(
     llmRequest,
-    effectiveSchema,
+    listSchema.jsonSchema,
   );
   if (isNuaValidationError(cacheServiceOrError)) {
     throw new Error(
@@ -69,41 +89,31 @@ export async function executeCastArrayLlmRequest(
       full_prompt: "//# All rows served from cache",
     });
   } else {
-    const params = {
+    const result = await nuaClient.castArray({
       model,
       maxTokens: llmRequest.max_tokens,
-      temperature: llmRequest.temperature,
       input: {
         prompt: llmRequest.input_prompt || "",
-        primaryKey: llmRequest.input_primary_key || "id", // fallback, though type guarantees string if cast/array?
+        data: cacheService.uncachedRows,
       },
-      data: cacheService.uncachedRows,
-      output: {
-        name: llmRequest.output_name,
-        effectiveSchema,
-      },
-    };
+      output: listSchema,
+    });
 
-    const {
-      data,
-      usage: resultUsage,
-      success,
-      error,
-      prompt,
-    } = await nuaClient.castArray(params);
-
-    // Save the prompt regardless of success/failure so we can reproduce errors
-    if (prompt) {
+    // Save the prompt that was sent, regardless of success/failure, so we can reproduce errors
+    if (result.prompt) {
       const table = new LlmRequestModel();
-      await table.update(llmRequest.id, { full_prompt: prompt });
+      await table.update(llmRequest.id, {
+        system_prompt: result.prompt.system,
+        full_prompt: result.prompt.full,
+      });
     }
 
-    if (!success || !data) {
-      throw new Error(`Cast array failed: ${error}`);
+    if (!result.success) {
+      throw new Error(`Cast array failed: ${result.error}`);
     }
 
-    usage = resultUsage || normalizedUsageZero;
-    llmOutputMappedRows = data as MappedLlmOutputEffectiveSchemaRow[];
+    usage = result.usage;
+    llmOutputMappedRows = result.data as MappedLlmOutputEffectiveSchemaRow[];
   }
 
   // Let's save the results and update the cache (with per-row token estimates)

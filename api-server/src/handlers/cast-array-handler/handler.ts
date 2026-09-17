@@ -7,7 +7,7 @@ import { validateCastArrayRequestParams } from "#handlers/cast-array-handler/val
 import { sendUnauthorized_unlessUser } from "#handlers/user-request-gating";
 import { workerUtils } from "#lib/graphile-worker-utils";
 import { getConfiguredProviderIds } from "#lib/llm-providers";
-import { wrapArraySchema } from "nua-llm-core";
+import { listSchema } from "nua-llm-core";
 import { isNuaValidationError, NuaValidationError } from "nua-llm-core";
 import executeLlmRequest from "#modules/execute-llm-request/execute-llm-request";
 import { validateJsonSchema } from "nua-llm-core";
@@ -30,13 +30,14 @@ function addEffectiveSchema(
     ...validParams,
     output: {
       ...validParams.output,
-      effectiveSchema: wrapArraySchema(
+      // Stored with the request; execution reads this same schema back (see parseListSchema).
+      effectiveSchema: listSchema(
         validParams.output.schema as Record<string, unknown>,
         {
           primaryKey: validParams.input.primaryKey,
           outputName: validParams.output.name,
         },
-      ),
+      ).jsonSchema,
     },
   };
 }

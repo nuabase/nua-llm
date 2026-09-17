@@ -48,6 +48,11 @@ export class Nua {
     return new Nua(new GatewayBackend(config));
   }
 
+  /**
+   * Runs casts in this process: on LLM providers' APIs with your API keys (`providers`), or
+   * on a coding-agent CLI installed on this machine (`localAgent`, set up with `localAgent()` or
+   * `findLocalAgent()` from "nuabase/local-agent").
+   */
   static direct(config: DirectConfig): Nua {
     return new Nua(new DirectBackend(config));
   }
