@@ -2,6 +2,7 @@ import { Logger } from "../lib/logger";
 import { JsonSchema } from "../lib/schema-utils";
 import { unwrapEnvelope, wrapInEnvelope } from "../modules/cast/envelope";
 import { CastRequest } from "../modules/cast/cast-request";
+import { listSchema } from "../modules/cast/list-schema";
 import { renderPrompt } from "../modules/cast/prompts/render-prompt";
 import { runCast } from "../modules/cast/run-cast";
 import {
@@ -80,6 +81,65 @@ describe("envelope", () => {
       properties: { value: { type: "string" } },
       required: ["value"],
       additionalProperties: false,
+    });
+  });
+
+  it("drops $schema from a list's item schema", () => {
+    const { jsonSchema } = listSchema(
+      { $schema: "http://json-schema.org/draft-07/schema#", type: "string" },
+      { primaryKey: "id", outputName: "account" },
+    );
+    expect(wrapInEnvelope(jsonSchema).properties).toEqual({
+      value: {
+        type: "array",
+        items: {
+          type: "object",
+          required: ["id", "account"],
+          properties: {
+            id: { anyOf: [{ type: "string" }, { type: "number" }, { type: "integer" }] },
+            account: { type: "string" },
+          },
+        },
+      },
+    });
+  });
+
+  it("drops $schema from every subschema, but not from property names or literal values", () => {
+    const dialect = "https://json-schema.org/draft/2020-12/schema";
+    const literal = { $schema: dialect };
+    const schema = {
+      $schema: dialect,
+      type: "object",
+      properties: { $schema: { $schema: dialect, type: "string" } },
+      patternProperties: { "^x-": { $schema: dialect } },
+      additionalProperties: { $schema: dialect },
+      $defs: { row: { $schema: dialect, items: [{ $schema: dialect }] } },
+      anyOf: [{ $schema: dialect, not: { $schema: dialect } }, true],
+      if: { $schema: dialect },
+      then: { $schema: dialect, prefixItems: [{ $schema: dialect }] },
+      dependencies: { a: ["b"], c: { $schema: dialect } },
+      const: literal,
+      enum: [literal],
+      default: literal,
+      examples: [literal],
+    };
+
+    expect(wrapInEnvelope(schema).properties).toEqual({
+      value: {
+        type: "object",
+        properties: { $schema: { type: "string" } },
+        patternProperties: { "^x-": {} },
+        additionalProperties: {},
+        $defs: { row: { items: [{}] } },
+        anyOf: [{ not: {} }, true],
+        if: {},
+        then: { prefixItems: [{}] },
+        dependencies: { a: ["b"], c: {} },
+        const: literal,
+        enum: [literal],
+        default: literal,
+        examples: [literal],
+      },
     });
   });
 
