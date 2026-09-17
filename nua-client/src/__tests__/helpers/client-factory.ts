@@ -32,9 +32,9 @@ export function createTestClient(mode: TestMode): Nua {
     envKey: string;
     defaultModel: string;
   }> = [
-    { provider: 'groq', envKey: 'GROQ_API_KEY', defaultModel: 'qwen/qwen3.6-27b' },
+    { provider: 'groq', envKey: 'GROQ_API_KEY', defaultModel: 'qwen/qwen3.8-27b' },
     { provider: 'openrouter', envKey: 'OPENROUTER_API_KEY', defaultModel: 'z-ai/glm-5.2' },
-    { provider: 'cerebras', envKey: 'CEREBRAS_API_KEY', defaultModel: 'zai-glm-4.7' },
+    { provider: 'cerebras', envKey: 'CEREBRAS_API_KEY', defaultModel: 'qwen-3.8-27b' },
     { provider: 'gemini', envKey: 'GEMINI_API_KEY', defaultModel: 'gemini-2.5-flash' },
   ];
 

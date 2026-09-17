@@ -8,14 +8,14 @@ describe("resolveModelInput", () => {
   it("resolves an omitted model to the fast alias", () => {
     expect(resolveModelInput(undefined, configured("cerebras"))).toEqual({
       provider: "cerebras",
-      model: "zai-glm-4.7",
+      model: "qwen-3.8-27b",
     });
   });
 
   it("resolves aliases by configured provider order", () => {
     expect(resolveModelInput({ alias: "fast" }, configured("groq"))).toEqual({
       provider: "groq",
-      model: "qwen/qwen3.6-27b",
+      model: "qwen/qwen3.8-27b",
     });
   });
 

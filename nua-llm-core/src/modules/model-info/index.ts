@@ -23,8 +23,8 @@ export type ModelInput = ProviderModel | { alias: ModelAliasName };
 
 export const MODEL_ALIASES: Record<ModelAliasName, ProviderModel[]> = {
   fast: [
-    { provider: "cerebras", model: "zai-glm-4.7" },
-    { provider: "groq", model: "qwen/qwen3.6-27b" },
+    { provider: "cerebras", model: "qwen-3.8-27b" },
+    { provider: "groq", model: "qwen/qwen3.8-27b" },
     { provider: "openrouter", model: "z-ai/glm-5.2" },
   ],
   gemini: [

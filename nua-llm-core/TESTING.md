@@ -20,8 +20,8 @@ Hits real LLM endpoints. Requires API keys set as environment variables. Tests t
 
 | Provider    | Provider-native model     | Env Var              |
 |-------------|---------------------------|----------------------|
-| Groq        | `qwen/qwen3.6-27b`        | `GROQ_API_KEY`       |
-| Cerebras    | `zai-glm-4.7`             | `CEREBRAS_API_KEY`   |
+| Groq        | `qwen/qwen3.8-27b`        | `GROQ_API_KEY`       |
+| Cerebras    | `qwen-3.8-27b`            | `CEREBRAS_API_KEY`   |
 | Gemini      | `gemini-2.5-flash`        | `GEMINI_API_KEY`     |
 | OpenRouter  | `z-ai/glm-5.2`            | `OPENROUTER_API_KEY` |
 
