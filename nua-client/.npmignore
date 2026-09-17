@@ -4,6 +4,7 @@ DEVELOPMENT.md
 mise.toml
 .idea
 PUBLISHING.md
+PUBLISHING-COMMAND.md
 .yarn
 node_modules
 scripts
