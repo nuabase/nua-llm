@@ -1,5 +1,5 @@
 /** Supported coding-agent CLIs, in the order findLocalAgent() tries them. */
-export const LOCAL_AGENT_IDS = ["claude-code", "codex"] as const;
+export const LOCAL_AGENT_IDS = ["claude-code", "codex", "pi"] as const;
 
 export type LocalAgentId = (typeof LOCAL_AGENT_IDS)[number];
 

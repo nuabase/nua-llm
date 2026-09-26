@@ -23,10 +23,12 @@ export type TestMode = { name: string } & (
  */
 type DirectProvider = 'groq' | 'openrouter' | 'cerebras' | 'gemini';
 
-// Each agent's model for tests: Claude Code's fastest model, and Codex's default.
+// Each agent's model for tests: Claude Code's fastest model, and the default model for
+// Codex and Pi (Pi needs its own `provider/id` name, which differs per machine).
 const LOCAL_AGENT_TEST_MODELS: Record<LocalAgentId, string | undefined> = {
   'claude-code': 'haiku',
   codex: undefined,
+  pi: undefined,
 };
 
 /**

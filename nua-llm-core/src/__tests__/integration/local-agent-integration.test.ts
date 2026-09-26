@@ -24,10 +24,19 @@ describeIfAgents("detectLocalAgents", () => {
   }, 60_000);
 });
 
+// Whether each agent has any native schema enforcement at all. Pi only takes a
+// schema in the prompt.
+const SUPPORTS_NATIVE_SCHEMA: Record<LocalAgentId, boolean> = {
+  "claude-code": true,
+  codex: true,
+  pi: false,
+};
+
 // Whether each agent can enforce the fallback test's schema (an optional property) natively.
 const ENFORCES_OPTIONAL_PROPERTIES: Record<LocalAgentId, boolean> = {
   "claude-code": true,
   codex: false,
+  pi: false,
 };
 
 describe.each(agents.length > 0 ? agents : ["none" as const])("local agent %s", (agent) => {
@@ -38,7 +47,7 @@ describe.each(agents.length > 0 ? agents : ["none" as const])("local agent %s", 
 
   const client = new NuaLlmClient(localAgent({ agent, logger: new ConsoleLogger() }));
 
-  it("casts a list with native schema enforcement", async () => {
+  it("casts a list of rows", async () => {
     const result = await client.castArray<{ id: string; account: string }>({
       input: {
         prompt: "Pick the ledger account for each bank transaction.",
@@ -56,7 +65,7 @@ describe.each(agents.length > 0 ? agents : ["none" as const])("local agent %s", 
     if (!result.success) throw new Error(result.error);
     const byId = Object.fromEntries(result.data.map((row) => [row.id, row.account]));
     expect(byId).toEqual({ "txn-1": "Expenses:Food", "txn-2": "Expenses:Travel" });
-    expect(result.schemaEnforcement).toBe("native");
+    expect(result.schemaEnforcement).toBe(SUPPORTS_NATIVE_SCHEMA[agent] ? "native" : "in-prompt");
     expect(result.origin).toMatchObject({ engine: "local-agent", agent });
     expect(result.usage.totalTokens).toBeGreaterThan(0);
   }, 300_000);

@@ -1,5 +1,6 @@
 import { claudeCodeAdapter } from "../modules/engine/local-agent/adapters/claude-code";
 import { codexAdapter } from "../modules/engine/local-agent/adapters/codex";
+import { piAdapter } from "../modules/engine/local-agent/adapters/pi";
 import { AgentProcessResult } from "../modules/engine/local-agent/adapters/types";
 import { AttemptRequest } from "../modules/engine/llm-engine";
 
@@ -228,5 +229,121 @@ describe("codexAdapter", () => {
   it("reads login status from the exit code", () => {
     expect(codexAdapter.readLoginStatus(processResult({ stdout: "Logged in using ChatGPT" })).loggedIn).toBe(true);
     expect(codexAdapter.readLoginStatus(processResult({ exitCode: 1, stdout: "Not logged in" })).loggedIn).toBe(false);
+  });
+});
+
+describe("piAdapter", () => {
+  const successMessage = {
+    type: "message_end",
+    message: {
+      role: "assistant",
+      content: [
+        { type: "thinking", thinking: "We should reply with JSON." },
+        { type: "text", text: '{"value":[1,2]}' },
+        { type: "toolCall", toolName: "read" },
+      ],
+      provider: "openrouter",
+      model: "~deepseek/deepseek-flash-latest",
+      usage: {
+        input: 80,
+        output: 72,
+        cacheRead: 10,
+        cacheWrite: 5,
+        totalTokens: 167,
+        cost: { total: 0.00003848 },
+      },
+      stopReason: "stop",
+    },
+  };
+  const jsonl = (events: object[]) => events.map((e) => JSON.stringify(e)).join("\n");
+
+  it("builds a tool-less, session-less invocation with the prompt on stdin", () => {
+    const invocation = piAdapter.buildInvocation(nativeRequest, "openrouter/~deepseek/deepseek-flash-latest");
+    expect(invocation.args).toEqual(
+      expect.arrayContaining(["--mode", "json", "--no-session", "--no-tools", "--offline"]),
+    );
+    expect(invocation.args[invocation.args.indexOf("--system-prompt") + 1]).toMatch(/data transformation/);
+    expect(invocation.args[invocation.args.indexOf("--model") + 1]).toBe(
+      "openrouter/~deepseek/deepseek-flash-latest",
+    );
+    expect(invocation.stdin).toBe("Double each value");
+    // The prompt is not an argv positional; it comes from stdin.
+    expect(invocation.args).not.toContain(nativeRequest.prompt);
+  });
+
+  it("omits the model flag when no model is given", () => {
+    const invocation = piAdapter.buildInvocation(inPromptRequest, undefined);
+    expect(invocation.args).not.toContain("--model");
+    expect(invocation.args).not.toContain("--json-schema");
+  });
+
+  it("has no native schema", () => {
+    expect(piAdapter.nativeSchema(ENVELOPE_SCHEMA)).toBeNull();
+  });
+
+  it("returns structured output with normalized usage and model", () => {
+    const reply = piAdapter.readResult(processResult({ stdout: jsonl([successMessage]) }), nativeRequest);
+    expect(reply).toEqual({
+      kind: "answered",
+      answer: { kind: "structured", envelope: { value: [1, 2] } },
+      usage: { promptTokens: 95, completionTokens: 72, totalTokens: 167 },
+      model: "~deepseek/deepseek-flash-latest",
+      costUsdEstimate: 0.00003848,
+    });
+  });
+
+  it("returns the assistant text for an in-prompt request", () => {
+    const reply = piAdapter.readResult(processResult({ stdout: jsonl([successMessage]) }), inPromptRequest);
+    expect(reply).toMatchObject({ kind: "answered", answer: { kind: "text", text: '{"value":[1,2]}' } });
+  });
+
+  it("fails when the assistant stopped with an error", () => {
+    const stopped = {
+      type: "message_end",
+      message: {
+        role: "assistant",
+        content: [],
+        provider: "openai-codex",
+        model: "gpt-5.3-codex-spark",
+        usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: { total: 0 } },
+        stopReason: "error",
+        errorMessage:
+          "Codex error: The 'gpt-5.3-codex-spark' model is not supported when using Codex with a ChatGPT account.",
+      },
+    };
+    const reply = piAdapter.readResult(processResult({ exitCode: 1, stdout: jsonl([stopped]) }), nativeRequest);
+    expect(reply).toMatchObject({ kind: "failed", failure: { kind: "fatal" } });
+  });
+
+  it("fails when auto retry runs out", () => {
+    const events = [{ type: "auto_retry_end", success: false, finalError: "529 overloaded" }];
+    const reply = piAdapter.readResult(processResult({ exitCode: 1, stdout: jsonl(events) }), nativeRequest);
+    expect(reply).toMatchObject({
+      kind: "failed",
+      failure: { kind: "transient", message: expect.stringMatching(/529 overloaded/) },
+    });
+  });
+
+  it("fails when no assistant message was written", () => {
+    const reply = piAdapter.readResult(
+      processResult({ exitCode: 1, stdout: jsonl([{ type: "agent_start" }]), stderr: "boom" }),
+      nativeRequest,
+    );
+    expect(reply).toMatchObject({
+      kind: "failed",
+      failure: { message: expect.stringMatching(/without a reply: boom/) },
+    });
+  });
+
+  it("treats a non-JSON native reply as transient", () => {
+    const message = { ...successMessage, message: { ...successMessage.message, content: [{ type: "text", text: "sure! [1,2]" }] } };
+    const reply = piAdapter.readResult(processResult({ stdout: jsonl([message]) }), nativeRequest);
+    expect(reply).toMatchObject({ kind: "failed", failure: { kind: "transient" } });
+  });
+
+  it("reports installed Pi as ready to call", () => {
+    expect(piAdapter.loginStatusArgs).toEqual(["--version"]);
+    expect(piAdapter.readLoginStatus(processResult({ stdout: "0.87.1" })).loggedIn).toBe(true);
+    expect(piAdapter.readLoginStatus(processResult({ exitCode: 1 })).loggedIn).toBe(false);
   });
 });
