@@ -29,7 +29,7 @@ function run(
   args: string[],
   env: NodeJS.ProcessEnv,
   stdio: StdioOptions,
-  cwd = clientDir,
+  cwd = clientDir
 ) {
   const result = spawnSync(command, args, { cwd, env, stdio });
   if (result.error) throw result.error;
