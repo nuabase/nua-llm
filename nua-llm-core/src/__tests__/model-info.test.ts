@@ -15,7 +15,7 @@ describe("resolveModelInput", () => {
   it("resolves aliases by configured provider order", () => {
     expect(resolveModelInput({ alias: "fast" }, configured("groq"))).toEqual({
       provider: "groq",
-      model: "qwen/qwen3.8-27b",
+      model: "openai/gpt-oss-120b",
     });
   });
 

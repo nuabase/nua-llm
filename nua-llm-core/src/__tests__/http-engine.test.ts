@@ -91,7 +91,7 @@ describe("providerEngines", () => {
 
     respondWith(200, { choices: [{ message: { content: "7" } }] });
     const outcome = await route.engine.attempt(request);
-    expect(outcome).toMatchObject({ origin: { engine: "http", provider: "groq", model: "qwen/qwen3.8-27b" } });
+    expect(outcome).toMatchObject({ origin: { engine: "http", provider: "groq", model: "openai/gpt-oss-120b" } });
   });
 
   it("uses its default model when a call names none", () => {
