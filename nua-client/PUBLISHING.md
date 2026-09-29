@@ -1,13 +1,18 @@
 ## Publishing to npm
 
-Use `release` script to publish the package:
+Only this package is published, as `nuabase`. It bundles `nua-llm-core`, so a change to either package needs a release.
 
-- `pnpm release` – release a new patch version to npm
-- `pnpm release minor` – release a new minor version to npm
-- `pnpm release major` – release a new major version to npm
-- `pnpm release minor --stage alpha` – release a new minor alpha version to npm (for example, `1.1.0-alpha.0`)
+A release happens in three steps:
 
-Note that release script will always publish public packages to npm. If you want to publish a private package, change release script in `scripts/release.ts`.
+1. Record the version bump as a changeset. Run `pnpm changeset` at the workspace root and pick `nuabase` with a patch, minor or major bump. The release train can also write the changeset for you.
+2. Apply the changesets with `pnpm release:version` at the workspace root. This sets the new version in `package.json`, writes `CHANGELOG.md`, and deletes the applied changesets.
+3. Run the release train from `../sapporta-devtools` with `pnpm release-train`. The train commits the version change as "Version packages for release", runs `pnpm release:publish` in this workspace, and pushes.
+
+`pnpm release:publish` runs `pnpm release` in this package. That script runs `pnpm test` without the gateway tests, then publishes the current version with `pnpm publish --access public`, unless that version is already on npm. npm may ask you to log in through the browser or with a passkey. Pass `--dry-run` (`pnpm release --dry-run`) to run the tests and a publish dry run. The scripts never commit, push or pull; the release train does all git work.
+
+`pnpm release:status` at the workspace root prints the release state as JSON: the current version, whether it is on npm, the pending bump, and the commits since the last release that no changeset names.
+
+A release runs the direct and local-agent tests but not the gateway tests: `scripts/release.ts` sets `SKIP_GATEWAY_TESTS=1`, so no Nuabase API key is needed. The direct tests need a provider key and the local-agent tests read `NUA_LOCAL_AGENTS`; both come from the workspace's `mise.toml`, which is why `pnpm release:publish` runs the release through `mise exec`. Running `pnpm release` in this package directly uses whatever your shell has set.
 
 ## Publishing with GitHub Actions
 
@@ -36,5 +41,3 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 ```
-
-3. To create a new release, use commands from the previous section but with `--no-publish` flag, for example: `pnpm release minor --no-publish`.
