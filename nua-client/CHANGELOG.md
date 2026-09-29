@@ -1,5 +1,11 @@
 # nuabase
 
+## 2.3.9
+
+### Patch Changes
+
+- Format the release script with Prettier
+
 ## 2.3.8
 
 ### Patch Changes
