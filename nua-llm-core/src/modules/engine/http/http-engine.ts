@@ -1,5 +1,7 @@
 import { Logger } from "../../../lib/logger";
-import { AttemptFailure, AttemptOutcome, AttemptRequest, LlmEngine } from "../llm-engine";
+import { JsonSchema } from "../../../lib/schema-utils";
+import { toStrictSchema } from "../../../lib/strict-json-schema";
+import { Answer, AttemptFailure, AttemptOutcome, AttemptRequest, LlmEngine } from "../llm-engine";
 import { callProvider, ProviderTarget } from "./provider-call";
 import { providerConfigs } from "./provider-config";
 
@@ -14,14 +16,17 @@ export class HttpEngine implements LlmEngine {
     private readonly logger: Logger,
   ) {}
 
-  /** Provider APIs are given the schema in the prompt; none is enforced natively yet. */
-  nativeSchema(): null {
-    return null;
+  /** Enforced in strict mode on models whose provider supports it; other models get the schema in the prompt. */
+  nativeSchema(envelopeSchema: JsonSchema): JsonSchema | null {
+    const { provider, model } = this.target;
+    if (!providerConfigs[provider].strictSchemaModels?.has(model)) return null;
+    return toStrictSchema(envelopeSchema);
   }
 
   async attempt(request: AttemptRequest): Promise<AttemptOutcome> {
     const { provider, model, apiKey } = this.target;
     const config = providerConfigs[provider];
+    const responseSchema = request.enforcement.kind === "native" ? request.enforcement.schema : undefined;
 
     const call = await callProvider(
       {
@@ -29,7 +34,7 @@ export class HttpEngine implements LlmEngine {
         apiOperation: config.apiOperation,
         maxTokens: request.maxTokens,
         request: config.buildRequest(
-          { prompt: request.prompt, model, maxTokens: request.maxTokens },
+          { prompt: request.prompt, model, maxTokens: request.maxTokens, responseSchema },
           apiKey,
         ),
         parseResponse: config.parseResponse,
@@ -40,19 +45,37 @@ export class HttpEngine implements LlmEngine {
     );
 
     if (call.kind === "failed") {
-      return { kind: "failed", failure: failureForStatus(call.status, call.message) };
+      return { kind: "failed", failure: failureForStatus(call.status, call.message, responseSchema !== undefined) };
+    }
+
+    const answer = responseSchema ? readEnvelope(call.reply.text) : { kind: "text" as const, text: call.reply.text };
+    if (!answer) {
+      return {
+        kind: "failed",
+        failure: { kind: "transient", message: `Structured output is not valid JSON: ${call.reply.text}` },
+      };
     }
 
     return {
       kind: "answered",
-      answer: { kind: "text", text: call.reply.text },
+      answer,
       usage: call.reply.usage,
       origin: { engine: "http", provider, model },
     };
   }
 }
 
-function failureForStatus(status: number | undefined, message: string): AttemptFailure {
+function readEnvelope(text: string): Answer | null {
+  try {
+    return { kind: "structured", envelope: JSON.parse(text) };
+  } catch {
+    return null;
+  }
+}
+
+function failureForStatus(status: number | undefined, message: string, sentSchema: boolean): AttemptFailure {
+  // A 400 on a request that carried a schema is most likely the provider refusing the schema.
+  if (sentSchema && status === 400) return { kind: "schema-rejected", message };
   const fatal = status !== undefined && FATAL_HTTP_STATUSES.has(status);
   return { kind: fatal ? "fatal" : "transient", message };
 }

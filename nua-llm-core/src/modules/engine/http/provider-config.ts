@@ -1,3 +1,5 @@
+import { JsonSchema } from "../../../lib/schema-utils";
+
 export type ProviderRequestBase = {
   url: string;
   method?: string;
@@ -23,6 +25,8 @@ export interface ProviderRequestOptions {
   model: string;
   maxTokens: number;
   assistantPrefillPrompt?: string;
+  /** A JSON schema the provider enforces on the reply, in strict mode. */
+  responseSchema?: JsonSchema;
 }
 
 export type NormalizedUsage = {
@@ -46,6 +50,8 @@ export interface ProviderConfig {
   providerId: LlmProviderId;
   apiOperation: string;
   errorLabel: string;
+  /** Models that can enforce a response JSON schema in strict mode. */
+  strictSchemaModels?: ReadonlySet<string>;
   buildRequest(
     options: ProviderRequestOptions,
     apiKey: string,
@@ -180,6 +186,7 @@ const buildOpenAiStyleRequest =
       model,
       maxTokens,
       assistantPrefillPrompt,
+      responseSchema,
     }: ProviderRequestOptions,
     apiKey: string,
   ): ProviderRequestBase => {
@@ -198,6 +205,12 @@ const buildOpenAiStyleRequest =
       top_p: 1,
       stream: false,
       stop: null,
+      ...(responseSchema && {
+        response_format: {
+          type: "json_schema",
+          json_schema: { name: "response", strict: true, schema: responseSchema },
+        },
+      }),
     };
 
     const headers = {
@@ -408,6 +421,12 @@ export const providerConfigs: Record<LlmProviderId, ProviderConfig> = {
     providerId: "groq",
     apiOperation: "chat/completions",
     errorLabel: "Groq",
+    // https://console.groq.com/docs/structured-outputs
+    strictSchemaModels: new Set([
+      "openai/gpt-oss-120b",
+      "openai/gpt-oss-20b",
+      "qwen/qwen3.8-27b",
+    ]),
     buildRequest: buildOpenAiStyleRequest(
       "https://api.groq.com/openai/v1/chat/completions",
     ),

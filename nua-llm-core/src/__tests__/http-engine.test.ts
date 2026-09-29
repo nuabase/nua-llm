@@ -1,6 +1,7 @@
 import { Logger } from "../lib/logger";
 import { sendAgentTurn } from "../modules/agent/agent-turn";
 import { runAgent } from "../modules/agent/run-agent";
+import { wrapInEnvelope } from "../modules/cast/envelope";
 import { AttemptRequest } from "../modules/engine/llm-engine";
 import { HttpEngine } from "../modules/engine/http/http-engine";
 import { providerEngines } from "../modules/engine/http/provider-engines";
@@ -68,8 +69,55 @@ describe("HttpEngine.attempt", () => {
     });
   });
 
-  it("never enforces a schema natively", () => {
-    expect(engine.nativeSchema()).toBeNull();
+  it("gives models without strict structured outputs the schema in the prompt", () => {
+    expect(engine.nativeSchema(wrapInEnvelope({ type: "number" }))).toBeNull();
+  });
+});
+
+describe("HttpEngine with strict structured outputs", () => {
+  const engine = new HttpEngine({ ...target, model: "openai/gpt-oss-120b" }, silentLogger);
+  const schema = engine.nativeSchema(wrapInEnvelope({ type: "number" }));
+  const nativeRequest: AttemptRequest = { ...request, enforcement: { kind: "native", schema: schema! } };
+
+  it("enforces the envelope schema natively", () => {
+    expect(schema).toEqual({
+      type: "object",
+      properties: { value: { type: "number" } },
+      required: ["value"],
+      additionalProperties: false,
+    });
+  });
+
+  it("sends the schema in strict mode and reads the reply as the envelope", async () => {
+    respondWith(200, { choices: [{ message: { content: '{"value": 7}' } }] });
+    const outcome = await engine.attempt(nativeRequest);
+
+    const body = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
+    expect(body.response_format).toEqual({
+      type: "json_schema",
+      json_schema: { name: "response", strict: true, schema },
+    });
+    expect(outcome).toMatchObject({ kind: "answered", answer: { kind: "structured", envelope: { value: 7 } } });
+  });
+
+  it("sends no response format with the schema in the prompt", async () => {
+    respondWith(200, { choices: [{ message: { content: "7" } }] });
+    await engine.attempt(request);
+    const body = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
+    expect(body.response_format).toBeUndefined();
+  });
+
+  it("retries a reply that is not JSON", async () => {
+    respondWith(200, { choices: [{ message: { content: "seven" } }] });
+    expect(await engine.attempt(nativeRequest)).toMatchObject({ kind: "failed", failure: { kind: "transient" } });
+  });
+
+  it("reports a 400 as the schema being rejected", async () => {
+    respondWith(400, { error: { message: "invalid JSON schema" } });
+    expect(await engine.attempt(nativeRequest)).toMatchObject({
+      kind: "failed",
+      failure: { kind: "schema-rejected" },
+    });
   });
 });
 
