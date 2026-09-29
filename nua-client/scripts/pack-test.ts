@@ -1,7 +1,7 @@
 import signale from 'signale';
 import { $ } from 'zx';
 
-const ALLOWED_FILES = ['LICENSE', 'README.md', 'package.json'];
+const ALLOWED_FILES = ['CHANGELOG.md', 'LICENSE', 'README.md', 'package.json'];
 
 async function packCheck() {
   const result = await $`npm pack --dry-run --json`;
