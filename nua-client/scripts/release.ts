@@ -7,7 +7,8 @@
 // Usage: tsx scripts/release [--dry-run]
 
 import { spawnSync, type StdioOptions } from 'node:child_process';
-import { closeSync, openSync, readFileSync } from 'node:fs';
+import { closeSync, mkdtempSync, openSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import signale from 'signale';
 
@@ -23,8 +24,14 @@ function testEnv(): NodeJS.ProcessEnv {
   return { ...process.env, SKIP_GATEWAY_TESTS: '1' };
 }
 
-function run(command: string, args: string[], env: NodeJS.ProcessEnv, stdio: StdioOptions) {
-  const result = spawnSync(command, args, { cwd: clientDir, env, stdio });
+function run(
+  command: string,
+  args: string[],
+  env: NodeJS.ProcessEnv,
+  stdio: StdioOptions,
+  cwd = clientDir,
+) {
+  const result = spawnSync(command, args, { cwd, env, stdio });
   if (result.error) throw result.error;
   if (result.status !== 0) {
     throw new Error(`${command} ${args.join(' ')} exited with status ${result.status}`);
@@ -79,14 +86,24 @@ function release() {
   }
 
   signale.info(`Publishing ${name}@${version}${dryRun ? ' (dry run)' : ''}`);
-  const args = ['publish', '--access', 'public', '--no-git-checks'];
+
+  // `pnpm pack` writes the tarball and `npm publish` uploads it. The upload is
+  // made by npm and not by `pnpm publish` because an account that requires 2FA
+  // for writes is asked to approve the publish in the browser, and only npm
+  // asks. pnpm 11 sends the upload without the approval, and npm answers it
+  // with a 404.
+  const packDir = mkdtempSync(path.join(tmpdir(), 'nuabase-release-'));
+  const tarball = path.join(packDir, 'package.tgz');
+  const args = ['publish', tarball, '--access', 'public'];
   if (dryRun) args.push('--dry-run');
 
   const stdin = publishStdin();
   try {
-    run('pnpm', args, process.env, [stdin.fd, 'inherit', 'inherit']);
+    run('pnpm', ['pack', '--out', tarball], process.env, 'inherit');
+    run('npm', args, process.env, [stdin.fd, 'inherit', 'inherit'], packDir);
   } finally {
     stdin.close();
+    rmSync(packDir, { recursive: true, force: true });
   }
   signale.success(`${name}@${version} has been ${dryRun ? 'packed (dry run)' : 'published'}`);
 }
