@@ -1,5 +1,11 @@
 # nuabase
 
+## 2.3.11
+
+### Patch Changes
+
+- Ship the changelog in the npm package
+
 ## 2.3.10
 
 ### Patch Changes
