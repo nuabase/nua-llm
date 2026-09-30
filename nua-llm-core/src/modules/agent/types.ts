@@ -30,6 +30,8 @@ export type ToolCallContent = {
   id: string;
   name: string;
   arguments: Record<string, unknown>;
+  /** Gemini's opaque signature for the call, which Gemini 3+ requires sent back with it. */
+  thoughtSignature?: string;
 };
 
 export type AssistantContentBlock = TextContent | ToolCallContent;

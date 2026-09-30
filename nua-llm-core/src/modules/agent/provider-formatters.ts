@@ -294,7 +294,7 @@ export async function parseOpenAiAgenticResponse(
 
 type GeminiPart =
   | { text: string }
-  | { functionCall: { name: string; args: Record<string, unknown> } }
+  | { functionCall: { name: string; args: Record<string, unknown> }; thoughtSignature?: string }
   | {
       functionResponse: {
         name: string;
@@ -332,6 +332,7 @@ function convertMessagesToGemini(
                 name: block.name,
                 args: block.arguments,
               },
+              ...(block.thoughtSignature && { thoughtSignature: block.thoughtSignature }),
             });
           }
         }
@@ -432,6 +433,7 @@ type GeminiAgenticResponse = {
           name: string;
           args: Record<string, unknown>;
         };
+        thoughtSignature?: string;
       }>;
     };
     finishReason?: string;
@@ -479,6 +481,7 @@ export async function parseGeminiAgenticResponse(
         id: crypto.randomUUID(),
         name: part.functionCall.name,
         arguments: part.functionCall.args,
+        ...(part.thoughtSignature && { thoughtSignature: part.thoughtSignature }),
       });
     }
   }
@@ -659,6 +662,7 @@ type GeminiStreamChunk = {
           name: string;
           args: Record<string, unknown>;
         };
+        thoughtSignature?: string;
       }>;
     };
     finishReason?: string;
@@ -718,6 +722,7 @@ export async function streamGeminiAgenticResponse(
           id: crypto.randomUUID(),
           name: part.functionCall.name,
           arguments: part.functionCall.args,
+          ...(part.thoughtSignature && { thoughtSignature: part.thoughtSignature }),
         });
       }
     }
