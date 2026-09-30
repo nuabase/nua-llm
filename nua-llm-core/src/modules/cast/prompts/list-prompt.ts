@@ -37,11 +37,11 @@ const SYSTEM_PROMPTS: Record<SchemaEnforcementKind, string> = {
 export function renderListPrompt(cast: ListCastRequest, enforcement: SchemaEnforcementKind): RenderedPrompt {
   const withPrimaryKey = replaceTemplateVarName(SYSTEM_PROMPTS[enforcement], "PRIMARY_KEY", cast.primaryKey);
   const system = replaceTemplateVarName(withPrimaryKey, "OUTPUT_TYPE_NAME", cast.outputName);
-  const full = [
+  const reusable = [
     cast.prompt || "Transform the provided data according to the schema.",
     system,
     `<json-schema-spec> ${JSON.stringify(cast.schema)} </json-schema-spec>`,
-    `<input-data>${JSON.stringify(cast.rows)}</input-data>`,
-  ].join("\n");
-  return { system, full };
+  ];
+  const full = [...reusable, `<input-data>${JSON.stringify(cast.rows)}</input-data>`].join("\n");
+  return { system, full, reusablePrefix: reusable.join("\n") };
 }

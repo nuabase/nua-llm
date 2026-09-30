@@ -17,6 +17,8 @@ export type SchemaEnforcementKind = SchemaEnforcement["kind"];
 /** One prompt for an engine to answer once, on the model the engine was created for. */
 export type AttemptRequest = {
   prompt: string;
+  /** The start of `prompt` that repeats across calls of the same cast. Engines may cache it. */
+  reusablePrefix: string;
   maxTokens: number;
   enforcement: SchemaEnforcement;
 };

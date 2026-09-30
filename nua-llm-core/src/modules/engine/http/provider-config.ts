@@ -1,4 +1,5 @@
 import { JsonSchema } from "../../../lib/schema-utils";
+import { textHash } from "../../../lib/text-hash";
 import { NormalizedUsage } from "../../../lib/types";
 
 export type { NormalizedUsage };
@@ -26,6 +27,8 @@ export type LlmProviderId = (typeof LLM_PROVIDER_IDS)[number];
 
 export interface ProviderRequestOptions {
   prompt: string;
+  /** The start of `prompt` that repeats across calls; providers that cache prompt prefixes cache it. */
+  reusablePrefix?: string;
   model: string;
   maxTokens: number;
   assistantPrefillPrompt?: string;
@@ -188,12 +191,50 @@ export const normalizeGeminiUsage = (
   };
 };
 
-type OpenAiStyleDialect = {
+/** How one provider's OpenAI-style API differs from OpenAI's. Used for casts and agents alike. */
+export type OpenAiStyleDialect = {
   /** Some APIs (DeepSeek) accept only the older `max_tokens` parameter. */
   maxTokensParam?: "max_completion_tokens" | "max_tokens";
   /** Provider-specific fields merged into every request body. */
   extraBody?: Record<string, unknown>;
+  /**
+   * Models that cache prompt prefixes only where a `cache_control` marker asks for it (Claude).
+   * Other models cache prefixes automatically or not at all.
+   */
+  cachesOnlyWhenMarked?: (model: string) => boolean;
+  /**
+   * Send a `session_id` derived from the reusable prefix, so the provider routes every call of
+   * a cast to the same upstream, where the prefix is cached (OpenRouter).
+   */
+  sessionIdFromReusablePrefix?: boolean;
 };
+
+type OpenAiTextPart = { type: "text"; text: string; cache_control?: { type: "ephemeral" } };
+
+const EPHEMERAL_CACHE = { type: "ephemeral" } as const;
+
+/**
+ * The user message content. Where the model caches only marked prefixes, the reusable prefix
+ * becomes its own part with a cache marker, and the rest of the prompt follows it.
+ */
+function userContent(
+  prompt: string,
+  reusablePrefix: string | undefined,
+  marked: boolean,
+): string | OpenAiTextPart[] {
+  if (!marked || !reusablePrefix || !prompt.startsWith(reusablePrefix)) {
+    return prompt;
+  }
+  const perCall = prompt.slice(reusablePrefix.length);
+  // Claude rejects text parts that are only whitespace; then the whole prompt is reusable.
+  if (perCall.trim() === "") {
+    return [{ type: "text", text: prompt, cache_control: EPHEMERAL_CACHE }];
+  }
+  return [
+    { type: "text", text: reusablePrefix, cache_control: EPHEMERAL_CACHE },
+    { type: "text", text: perCall },
+  ];
+}
 
 const buildOpenAiStyleRequest =
   (
@@ -201,11 +242,14 @@ const buildOpenAiStyleRequest =
     {
       maxTokensParam = "max_completion_tokens",
       extraBody,
+      cachesOnlyWhenMarked,
+      sessionIdFromReusablePrefix,
     }: OpenAiStyleDialect = {},
   ) =>
   (
     {
       prompt,
+      reusablePrefix,
       model,
       maxTokens,
       assistantPrefillPrompt,
@@ -213,8 +257,11 @@ const buildOpenAiStyleRequest =
     }: ProviderRequestOptions,
     apiKey: string,
   ): ProviderRequestBase => {
-    const messages: Array<{ role: string; content: string }> = [];
-    messages.push({ role: "user", content: prompt });
+    const messages: Array<{ role: string; content: string | OpenAiTextPart[] }> = [];
+    messages.push({
+      role: "user",
+      content: userContent(prompt, reusablePrefix, cachesOnlyWhenMarked?.(model) ?? false),
+    });
 
     if (assistantPrefillPrompt) {
       messages.push({ role: "assistant", content: assistantPrefillPrompt });
@@ -229,6 +276,7 @@ const buildOpenAiStyleRequest =
       stream: false,
       stop: null,
       ...extraBody,
+      ...(sessionIdFromReusablePrefix && reusablePrefix && { session_id: `nua-cast-${textHash(reusablePrefix)}` }),
       ...(responseSchema && {
         response_format: {
           type: "json_schema",
@@ -447,6 +495,17 @@ const parseGeminiResponse = async (
  */
 export const deepseekRequestFields = { thinking: { type: "disabled" } };
 
+/**
+ * OpenRouter caches prompt prefixes automatically for most models, but Claude only where a
+ * `cache_control` marker asks for it. Calls of the same cast carry a `session_id` from their
+ * reusable prefix, so OpenRouter keeps them on the upstream that has the prefix cached.
+ * https://openrouter.ai/docs/features/prompt-caching
+ */
+export const openRouterDialect: OpenAiStyleDialect = {
+  cachesOnlyWhenMarked: (model) => /^~?anthropic\//.test(model),
+  sessionIdFromReusablePrefix: true,
+};
+
 export const providerConfigs: Record<LlmProviderId, ProviderConfig> = {
   groq: {
     providerId: "groq",
@@ -485,6 +544,7 @@ export const providerConfigs: Record<LlmProviderId, ProviderConfig> = {
     errorLabel: "OpenRouter",
     buildRequest: buildOpenAiStyleRequest(
       "https://openrouter.ai/api/v1/chat/completions",
+      openRouterDialect,
     ),
     parseResponse: parseOpenAiGPT5ThinkingStyleResponse("OpenRouter"),
   },

@@ -156,6 +156,8 @@ Every call returns a discriminated union. When `success` is `false`, you get an 
 | `source`    | `'gateway'` \| `'direct'`                                             | Which backend processed the request.               |
 | `meta`      | `object`                                                              | Additional metadata (varies by source).            |
 
+`usage` also has `promptCacheReadTokens` and `promptCacheWriteTokens` when the provider reports them: prompt tokens it read from or wrote to its prompt cache. They are part of `promptTokens`. Cache reads are billed at a steep discount, so keep `prompt` the same on every call of a cast and pass anything that varies in `data`: the prompt and schema come first in what the model sees, and providers cache that repeated start. On Claude, a cast whose prompt never repeats pays a 25% premium on it.
+
 **Gateway-specific metadata** (`meta` when `source` is `'gateway'`):
 
 | Field        | Type      | Description                               |

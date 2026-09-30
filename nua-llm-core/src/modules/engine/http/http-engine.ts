@@ -34,7 +34,13 @@ export class HttpEngine implements LlmEngine {
         apiOperation: config.apiOperation,
         maxTokens: request.maxTokens,
         request: config.buildRequest(
-          { prompt: request.prompt, model, maxTokens: request.maxTokens, responseSchema },
+          {
+            prompt: request.prompt,
+            reusablePrefix: request.reusablePrefix,
+            model,
+            maxTokens: request.maxTokens,
+            responseSchema,
+          },
           apiKey,
         ),
         parseResponse: config.parseResponse,

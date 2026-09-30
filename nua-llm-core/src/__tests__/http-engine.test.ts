@@ -15,6 +15,7 @@ const silentLogger: Logger = {
 
 const request: AttemptRequest = {
   prompt: "Return 7",
+  reusablePrefix: "",
   maxTokens: 100,
   enforcement: { kind: "in-prompt" },
 };

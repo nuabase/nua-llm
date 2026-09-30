@@ -1,6 +1,12 @@
 import { Logger } from "../../lib/logger";
 import { callProvider, ProviderTarget } from "../engine/http/provider-call";
-import { deepseekRequestFields, ProviderRequestBase, providerConfigs } from "../engine/http/provider-config";
+import {
+  deepseekRequestFields,
+  OpenAiStyleDialect,
+  openRouterDialect,
+  ProviderRequestBase,
+  providerConfigs,
+} from "../engine/http/provider-config";
 import {
   buildGeminiAgenticRequest,
   buildOpenAiAgenticRequest,
@@ -90,7 +96,7 @@ function agentCodec({ provider, apiKey }: ProviderTarget): AgentCodec {
     case "cerebras":
       return openAiStyleCodec("https://api.cerebras.ai/v1/chat/completions", apiKey, errorLabel);
     case "openrouter":
-      return openAiStyleCodec("https://openrouter.ai/api/v1/chat/completions", apiKey, errorLabel);
+      return openAiStyleCodec("https://openrouter.ai/api/v1/chat/completions", apiKey, errorLabel, openRouterDialect);
     case "deepseek":
       return openAiStyleCodec("https://api.deepseek.com/chat/completions", apiKey, errorLabel, {
         maxTokensParam: "max_tokens",
@@ -109,7 +115,7 @@ function openAiStyleCodec(
   url: string,
   apiKey: string,
   errorLabel: string,
-  dialect?: Parameters<typeof buildOpenAiAgenticRequest>[3],
+  dialect?: OpenAiStyleDialect,
 ): AgentCodec {
   return {
     buildRequest: (options) => buildOpenAiAgenticRequest(options, url, apiKey, dialect),

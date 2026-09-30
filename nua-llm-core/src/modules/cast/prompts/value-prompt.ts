@@ -31,11 +31,11 @@ const SYSTEM_PROMPTS: Record<SchemaEnforcementKind, string> = {
 
 export function renderValuePrompt(cast: ValueCastRequest, enforcement: SchemaEnforcementKind): RenderedPrompt {
   const system = replaceTemplateVarName(SYSTEM_PROMPTS[enforcement], "OUTPUT_TYPE_NAME", cast.outputName);
-  const full = [
+  const reusable = [
     cast.prompt || "Transform the provided data according to the schema.",
     system,
     `<json-schema-spec> ${JSON.stringify(cast.schema)} </json-schema-spec>`,
-    cast.data ? `<input-data>${JSON.stringify(cast.data)}</input-data>` : "",
-  ].join("\n");
-  return { system, full };
+  ];
+  const full = [...reusable, cast.data ? `<input-data>${JSON.stringify(cast.data)}</input-data>` : ""].join("\n");
+  return { system, full, reusablePrefix: reusable.join("\n") };
 }

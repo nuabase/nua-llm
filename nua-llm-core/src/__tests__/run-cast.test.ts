@@ -166,6 +166,7 @@ describe("runCast", () => {
     });
     expect(engine.requests[0]).toEqual({
       prompt: inPromptPrompt.full,
+      reusablePrefix: inPromptPrompt.reusablePrefix,
       maxTokens: 100,
       enforcement: { kind: "in-prompt" },
     });

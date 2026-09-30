@@ -53,7 +53,12 @@ function stubAgent(adapter: AgentAdapter, defaultModel: string | undefined) {
 async function originOfAttempt(agent: LocalAgent, model: ModelInput | undefined) {
   const route = agent.route(model);
   if (route.kind !== "routed") throw new Error(route.message);
-  const outcome = await route.engine.attempt({ prompt: "p", maxTokens: 100, enforcement: { kind: "in-prompt" } });
+  const outcome = await route.engine.attempt({
+    prompt: "p",
+    reusablePrefix: "",
+    maxTokens: 100,
+    enforcement: { kind: "in-prompt" },
+  });
   if (outcome.kind !== "answered") throw new Error(outcome.failure.message);
   return outcome.origin;
 }

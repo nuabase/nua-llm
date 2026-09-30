@@ -15,12 +15,14 @@ const ENVELOPE_SCHEMA = {
 
 const nativeRequest: AttemptRequest = {
   prompt: "Double each value",
+  reusablePrefix: "",
   maxTokens: 100,
   enforcement: { kind: "native", schema: ENVELOPE_SCHEMA },
 };
 
 const inPromptRequest: AttemptRequest = {
   prompt: "hi",
+  reusablePrefix: "",
   maxTokens: 100,
   enforcement: { kind: "in-prompt" },
 };

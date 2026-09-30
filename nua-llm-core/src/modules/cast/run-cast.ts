@@ -74,6 +74,7 @@ export async function runCast<T>(
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     const outcome = await engine.attempt({
       prompt: plan.prompt.full,
+      reusablePrefix: plan.prompt.reusablePrefix,
       maxTokens: request.maxTokens,
       enforcement: plan.enforcement,
     });

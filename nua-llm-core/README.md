@@ -137,8 +137,9 @@ Performs a single LLM call to extract an object matching the schema.
 *   `output.name`: Name of the entity (helps LLM context).
 *   `output.schema`: JSON Schema object defining the structure.
 *   **Returns**: `Promise<CastResult<T>>`, discriminated on `success`:
-    *   `success: true`: `data: T`, `usage` (token usage of the successful attempt), `prompt` (`{ system, full }`: the prompt that attempt sent, and the part of it that describes the output shape), `origin` (which engine answered: `{ engine: "http", provider, model }` or `{ engine: "local-agent", agent, model, costUsdEstimate }`), and `schemaEnforcement` (`"in-prompt"` or `"native"`).
+    *   `success: true`: `data: T`, `usage` (token usage of the successful attempt), `prompt` (`{ system, full, reusablePrefix }`: the prompt that attempt sent, the part of it that describes the output shape, and the start of it that repeats on every call of the cast), `origin` (which engine answered: `{ engine: "http", provider, model }` or `{ engine: "local-agent", agent, model, costUsdEstimate }`), and `schemaEnforcement` (`"in-prompt"` or `"native"`).
     *   `success: false`: `error: string`, and `prompt` when an attempt was made.
+*   **Prompt caching**: the caller's prompt, the instructions and the schema come before the data, so providers can cache them across calls. DeepSeek, and most models on OpenRouter, cache that prefix on their own; for Claude on OpenRouter the request marks it with `cache_control`, and OpenRouter casts carry a `session_id` derived from it so they reach the upstream that holds the cache. `usage.promptCacheReadTokens` and `usage.promptCacheWriteTokens` report what the provider read and wrote. Keep per-call values out of `input.prompt`, or every call starts differently and nothing is reused.
 
 ### `castArray<T>(params)`
 

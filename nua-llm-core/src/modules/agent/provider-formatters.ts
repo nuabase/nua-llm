@@ -5,6 +5,7 @@ import {
   normalizeOpenAiUsage,
   NormalizedUsage,
   normalizedUsageZero,
+  OpenAiStyleDialect,
   OpenAiUsage,
   ProviderRequestBase,
 } from "../engine/http/provider-config";
@@ -117,13 +118,7 @@ export function buildOpenAiAgenticRequest(
   },
   baseUrl: string,
   apiKey: string,
-  {
-    maxTokensParam = "max_completion_tokens",
-    extraBody,
-  }: {
-    maxTokensParam?: "max_completion_tokens" | "max_tokens";
-    extraBody?: Record<string, unknown>;
-  } = {},
+  { maxTokensParam = "max_completion_tokens", extraBody, cachesOnlyWhenMarked }: OpenAiStyleDialect = {},
 ): ProviderRequestBase {
   const messages = convertMessagesToOpenAi(
     options.messages,
@@ -138,6 +133,9 @@ export function buildOpenAiAgenticRequest(
     [maxTokensParam]: options.maxTokens,
     stream: options.stream ?? false,
     ...extraBody,
+    // Each turn resends the whole conversation, so caching through its last block lets the
+    // next turn read everything this one sent.
+    ...(cachesOnlyWhenMarked?.(options.model) && { cache_control: { type: "ephemeral" } }),
   };
 
   if (options.stream) {

@@ -33,4 +33,9 @@ export type ListCastRequest = {
 export type RenderedPrompt = {
   system: string;
   full: string;
+  /**
+   * The start of `full` that is the same on every call of this cast: the instructions and the
+   * schema. The rest of `full` is this call's data. Engines that cache prompt prefixes cache this part.
+   */
+  reusablePrefix: string;
 };
