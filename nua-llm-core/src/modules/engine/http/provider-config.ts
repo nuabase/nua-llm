@@ -1,4 +1,7 @@
 import { JsonSchema } from "../../../lib/schema-utils";
+import { NormalizedUsage } from "../../../lib/types";
+
+export type { NormalizedUsage };
 
 export type ProviderRequestBase = {
   url: string;
@@ -29,12 +32,6 @@ export interface ProviderRequestOptions {
   /** A JSON schema the provider enforces on the reply, in strict mode. */
   responseSchema?: JsonSchema;
 }
-
-export type NormalizedUsage = {
-  promptTokens: number;
-  completionTokens: number;
-  totalTokens: number;
-};
 
 export const normalizedUsageZero: NormalizedUsage = {
   promptTokens: 0,
@@ -120,6 +117,7 @@ export type GeminiUsageMetadata = {
   promptTokenCount?: number;
   candidatesTokenCount?: number;
   totalTokenCount?: number;
+  cachedContentTokenCount?: number;
   [key: string]: unknown;
 };
 
@@ -144,10 +142,18 @@ export const normalizeOpenAiUsage = (
     return normalizedUsageZero;
   }
 
+  const details = usage.prompt_tokens_details;
+  // OpenRouter and OpenAI report cache reads in prompt_tokens_details; DeepSeek's own API
+  // reports them as prompt_cache_hit_tokens.
+  const cacheRead = details?.cached_tokens ?? usage.prompt_cache_hit_tokens;
+  const cacheWrite = details?.cache_write_tokens;
+
   return {
     promptTokens: usage.prompt_tokens,
     completionTokens: usage.completion_tokens,
     totalTokens: usage.total_tokens,
+    ...(typeof cacheRead === "number" && { promptCacheReadTokens: cacheRead }),
+    ...(typeof cacheWrite === "number" && { promptCacheWriteTokens: cacheWrite }),
   };
 };
 
@@ -176,6 +182,9 @@ export const normalizeGeminiUsage = (
     promptTokens: usage.promptTokenCount,
     completionTokens: usage.candidatesTokenCount,
     totalTokens: usage.totalTokenCount,
+    ...(typeof usage.cachedContentTokenCount === "number" && {
+      promptCacheReadTokens: usage.cachedContentTokenCount,
+    }),
   };
 };
 

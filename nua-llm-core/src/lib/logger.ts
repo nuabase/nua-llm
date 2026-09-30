@@ -1,3 +1,6 @@
+import { NormalizedUsage } from "./types";
+
+
 export interface Logger {
   debug(message: string, context?: object): void;
   info(message: string, context?: object): void;
@@ -71,7 +74,7 @@ interface LlmResponseLog {
   status: number;
   responseLength: number;
   headers: Record<string, string>;
-  usage?: { promptTokens: number; completionTokens: number; totalTokens: number };
+  usage?: NormalizedUsage;
 }
 
 // Header allowlist for LLM responses - only log relevant headers

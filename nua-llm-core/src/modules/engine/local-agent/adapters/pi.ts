@@ -153,7 +153,13 @@ export const piAdapter: AgentAdapter = {
     const promptTokens = (usage.input ?? 0) + (usage.cacheRead ?? 0) + (usage.cacheWrite ?? 0);
     const completionTokens = usage.output ?? 0;
     const reported = {
-      usage: { promptTokens, completionTokens, totalTokens: promptTokens + completionTokens },
+      usage: {
+        promptTokens,
+        completionTokens,
+        totalTokens: promptTokens + completionTokens,
+        ...(usage.cacheRead !== undefined && { promptCacheReadTokens: usage.cacheRead }),
+        ...(usage.cacheWrite !== undefined && { promptCacheWriteTokens: usage.cacheWrite }),
+      },
       model: assistant.model,
       costUsdEstimate: usage.cost?.total,
     };

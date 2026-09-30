@@ -107,7 +107,15 @@ export const claudeCodeAdapter: AgentAdapter = {
       (usage.cache_read_input_tokens ?? 0);
     const completionTokens = usage.output_tokens ?? 0;
     const reported = {
-      usage: { promptTokens, completionTokens, totalTokens: promptTokens + completionTokens },
+      usage: {
+        promptTokens,
+        completionTokens,
+        totalTokens: promptTokens + completionTokens,
+        ...(usage.cache_read_input_tokens !== undefined && { promptCacheReadTokens: usage.cache_read_input_tokens }),
+        ...(usage.cache_creation_input_tokens !== undefined && {
+          promptCacheWriteTokens: usage.cache_creation_input_tokens,
+        }),
+      },
       model: Object.keys(json.modelUsage ?? {})[0],
       costUsdEstimate: json.total_cost_usd,
     };

@@ -73,7 +73,13 @@ describe("claudeCodeAdapter", () => {
     expect(reply).toEqual({
       kind: "answered",
       answer: { kind: "structured", envelope: success.structured_output },
-      usage: { promptTokens: 1260, completionTokens: 256, totalTokens: 1516 },
+      usage: {
+        promptTokens: 1260,
+        completionTokens: 256,
+        totalTokens: 1516,
+        promptCacheReadTokens: 0,
+        promptCacheWriteTokens: 0,
+      },
       model: "claude-haiku-4-5-20251001",
       costUsdEstimate: 0.003524,
     });
@@ -182,7 +188,7 @@ describe("codexAdapter", () => {
     expect(reply).toEqual({
       kind: "answered",
       answer: { kind: "structured", envelope: { value: [1, 2] } },
-      usage: { promptTokens: 13970, completionTokens: 35, totalTokens: 14005 },
+      usage: { promptTokens: 13970, completionTokens: 35, totalTokens: 14005, promptCacheReadTokens: 0 },
       model: undefined,
       costUsdEstimate: undefined,
     });
@@ -286,7 +292,13 @@ describe("piAdapter", () => {
     expect(reply).toEqual({
       kind: "answered",
       answer: { kind: "structured", envelope: { value: [1, 2] } },
-      usage: { promptTokens: 95, completionTokens: 72, totalTokens: 167 },
+      usage: {
+        promptTokens: 95,
+        completionTokens: 72,
+        totalTokens: 167,
+        promptCacheReadTokens: 10,
+        promptCacheWriteTokens: 5,
+      },
       model: "~deepseek/deepseek-flash-latest",
       costUsdEstimate: 0.00003848,
     });

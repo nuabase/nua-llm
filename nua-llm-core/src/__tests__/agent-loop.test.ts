@@ -38,6 +38,7 @@ describe("runAgentLoop", () => {
     expect(result.completionReason).toBe("stop");
     expect(result.textResponse).toBe("Hello, world!");
     expect(result.usage.totalTokens).toBe(15);
+    expect(result.usage).not.toHaveProperty("promptCacheReadTokens");
     expect(result.messages).toHaveLength(2); // user + assistant
   });
 
@@ -62,7 +63,7 @@ describe("runAgentLoop", () => {
               },
             ],
           },
-          usage: { promptTokens: 20, completionTokens: 10, totalTokens: 30 },
+          usage: { promptTokens: 20, completionTokens: 10, totalTokens: 30, promptCacheWriteTokens: 20 },
           stopReason: "tool_use",
         };
       }
@@ -73,7 +74,7 @@ describe("runAgentLoop", () => {
           role: "assistant",
           content: [{ type: "text", text: "The result is 4." }],
         },
-        usage: { promptTokens: 30, completionTokens: 8, totalTokens: 38 },
+        usage: { promptTokens: 30, completionTokens: 8, totalTokens: 38, promptCacheReadTokens: 20 },
         stopReason: "stop",
       };
     };
@@ -115,6 +116,8 @@ describe("runAgentLoop", () => {
     expect(result.usage.promptTokens).toBe(50);
     expect(result.usage.completionTokens).toBe(18);
     expect(result.usage.totalTokens).toBe(68);
+    expect(result.usage.promptCacheReadTokens).toBe(20);
+    expect(result.usage.promptCacheWriteTokens).toBe(20);
   });
 
   it("should handle tool not found gracefully", async () => {

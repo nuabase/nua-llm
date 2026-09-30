@@ -76,12 +76,7 @@ export class GatewayBackend implements LlmBackend {
     }
 
     const apiResponse = response as ApiCastValueResponse;
-    const usage: NormalizedUsage = {
-      promptTokens: apiResponse.llmUsage.promptTokens + apiResponse.cacheUsage.promptTokens,
-      completionTokens:
-        apiResponse.llmUsage.completionTokens + apiResponse.cacheUsage.completionTokens,
-      totalTokens: apiResponse.llmUsage.totalTokens + apiResponse.cacheUsage.totalTokens,
-    };
+    const usage = combinedUsage(apiResponse.llmUsage, apiResponse.cacheUsage);
 
     return {
       success: true,
@@ -113,12 +108,7 @@ export class GatewayBackend implements LlmBackend {
     }
 
     const apiResponse = response as ApiCastArrayResponse;
-    const usage: NormalizedUsage = {
-      promptTokens: apiResponse.llmUsage.promptTokens + apiResponse.cacheUsage.promptTokens,
-      completionTokens:
-        apiResponse.llmUsage.completionTokens + apiResponse.cacheUsage.completionTokens,
-      totalTokens: apiResponse.llmUsage.totalTokens + apiResponse.cacheUsage.totalTokens,
-    };
+    const usage = combinedUsage(apiResponse.llmUsage, apiResponse.cacheUsage);
 
     return {
       success: true,
@@ -196,4 +186,22 @@ export class GatewayBackend implements LlmBackend {
       return { error: 'Invalid response received from Nuabase API call, unable to parse' };
     }
   }
+}
+
+/**
+ * Tokens the LLM used for this request plus the tokens of results served from the gateway's cache.
+ * The provider's prompt-cache counts come from the LLM call alone.
+ */
+function combinedUsage(llmUsage: NormalizedUsage, cacheUsage: NormalizedUsage): NormalizedUsage {
+  return {
+    promptTokens: llmUsage.promptTokens + cacheUsage.promptTokens,
+    completionTokens: llmUsage.completionTokens + cacheUsage.completionTokens,
+    totalTokens: llmUsage.totalTokens + cacheUsage.totalTokens,
+    ...(llmUsage.promptCacheReadTokens !== undefined && {
+      promptCacheReadTokens: llmUsage.promptCacheReadTokens,
+    }),
+    ...(llmUsage.promptCacheWriteTokens !== undefined && {
+      promptCacheWriteTokens: llmUsage.promptCacheWriteTokens,
+    }),
+  };
 }

@@ -156,7 +156,19 @@ function addUsage(a: NormalizedUsage, b: NormalizedUsage): NormalizedUsage {
     promptTokens: a.promptTokens + b.promptTokens,
     completionTokens: a.completionTokens + b.completionTokens,
     totalTokens: a.totalTokens + b.totalTokens,
+    ...addReported("promptCacheReadTokens", a, b),
+    ...addReported("promptCacheWriteTokens", a, b),
   };
+}
+
+/** The sum of a count some turns may not report; absent when no turn reported it. */
+function addReported(
+  key: "promptCacheReadTokens" | "promptCacheWriteTokens",
+  a: NormalizedUsage,
+  b: NormalizedUsage,
+): Partial<NormalizedUsage> {
+  if (a[key] === undefined && b[key] === undefined) return {};
+  return { [key]: (a[key] ?? 0) + (b[key] ?? 0) };
 }
 
 function extractLastAssistantText(

@@ -1,4 +1,6 @@
-import type { AnswerOrigin, ModelInput, SchemaEnforcementKind } from 'nua-llm-core';
+import type { AnswerOrigin, ModelInput, NormalizedUsage, SchemaEnforcementKind } from 'nua-llm-core';
+
+export type { NormalizedUsage };
 
 export type CastValueParams = {
   prompt: string;
@@ -15,12 +17,6 @@ export type CastArrayParams = {
   outputName: string;
   outputSchema: object;
   model?: ModelInput;
-};
-
-export type NormalizedUsage = {
-  promptTokens: number;
-  completionTokens: number;
-  totalTokens: number;
 };
 
 // Gateway-specific metadata

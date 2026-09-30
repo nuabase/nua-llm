@@ -11,7 +11,8 @@ type CodexEvent = {
   message?: string;
   error?: { message?: string };
   item?: { type?: string; text?: string };
-  usage?: { input_tokens?: number; output_tokens?: number };
+  /** input_tokens includes cached_input_tokens. */
+  usage?: { input_tokens?: number; cached_input_tokens?: number; output_tokens?: number };
 };
 
 export const codexAdapter: AgentAdapter = {
@@ -87,8 +88,15 @@ export const codexAdapter: AgentAdapter = {
     const completed = events.filter((e) => e.type === "turn.completed");
     const promptTokens = completed.reduce((sum, e) => sum + (e.usage?.input_tokens ?? 0), 0);
     const completionTokens = completed.reduce((sum, e) => sum + (e.usage?.output_tokens ?? 0), 0);
+    const cacheReadReported = completed.some((e) => e.usage?.cached_input_tokens !== undefined);
+    const cacheReadTokens = completed.reduce((sum, e) => sum + (e.usage?.cached_input_tokens ?? 0), 0);
     const reported = {
-      usage: { promptTokens, completionTokens, totalTokens: promptTokens + completionTokens },
+      usage: {
+        promptTokens,
+        completionTokens,
+        totalTokens: promptTokens + completionTokens,
+        ...(cacheReadReported && { promptCacheReadTokens: cacheReadTokens }),
+      },
       // Codex does not report which model answered.
       model: undefined,
       costUsdEstimate: undefined,

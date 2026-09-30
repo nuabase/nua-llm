@@ -26,5 +26,8 @@ export function serializeCacheValue(
   result: unknown,
   usage: NormalizedUsage
 ): string {
-  return JSON.stringify({ result, usage });
+  // Only the token counts. The provider's prompt-cache counts describe the LLM call that
+  // produced the value, not a later read from this cache.
+  const { promptTokens, completionTokens, totalTokens } = usage;
+  return JSON.stringify({ result, usage: { promptTokens, completionTokens, totalTokens } });
 }

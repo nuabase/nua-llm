@@ -69,6 +69,20 @@ describe("serializeCacheValue", () => {
     expect(parsed.usage).toEqual(usage);
   });
 
+  it("should drop the provider's prompt-cache counts", () => {
+    const usage = {
+      promptTokens: 100,
+      completionTokens: 50,
+      totalTokens: 150,
+      promptCacheReadTokens: 80,
+      promptCacheWriteTokens: 0,
+    };
+
+    const parsed = JSON.parse(serializeCacheValue({ foo: "bar" }, usage));
+
+    expect(parsed.usage).toEqual({ promptTokens: 100, completionTokens: 50, totalTokens: 150 });
+  });
+
   it("should handle primitive results", () => {
     const result = "hello";
     const usage = { promptTokens: 10, completionTokens: 5, totalTokens: 15 };
