@@ -23,6 +23,9 @@ const nuaClient = new NuaLlmClient(
       gemini: config.llm.geminiApiKey
         ? { apiKey: config.llm.geminiApiKey }
         : undefined,
+      deepseek: config.llm.deepseekApiKey
+        ? { apiKey: config.llm.deepseekApiKey }
+        : undefined,
     },
   }),
 );

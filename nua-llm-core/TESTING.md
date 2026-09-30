@@ -22,8 +22,9 @@ Hits real LLM endpoints. Requires API keys set as environment variables. Tests t
 |-------------|---------------------------|----------------------|
 | Groq        | `openai/gpt-oss-120b`     | `GROQ_API_KEY`       |
 | Cerebras    | `qwen-3.8-27b`            | `CEREBRAS_API_KEY`   |
-| Gemini      | `gemini-2.5-flash`        | `GEMINI_API_KEY`     |
-| OpenRouter  | `z-ai/glm-5.2`            | `OPENROUTER_API_KEY` |
+| Gemini      | `gemini-3.8-flash`        | `GEMINI_API_KEY`     |
+| OpenRouter  | `z-ai/glm-5.3-flash`      | `OPENROUTER_API_KEY` |
+| DeepSeek    | `deepseek-flash`          | `DEEPSEEK_API_KEY`   |
 
 Tests for providers without a configured API key are automatically skipped.
 

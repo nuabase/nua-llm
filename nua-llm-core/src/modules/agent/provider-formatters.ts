@@ -117,6 +117,13 @@ export function buildOpenAiAgenticRequest(
   },
   baseUrl: string,
   apiKey: string,
+  {
+    maxTokensParam = "max_completion_tokens",
+    extraBody,
+  }: {
+    maxTokensParam?: "max_completion_tokens" | "max_tokens";
+    extraBody?: Record<string, unknown>;
+  } = {},
 ): ProviderRequestBase {
   const messages = convertMessagesToOpenAi(
     options.messages,
@@ -128,8 +135,9 @@ export function buildOpenAiAgenticRequest(
     messages,
     tools: tools.length > 0 ? tools : undefined,
     model: options.model,
-    max_completion_tokens: options.maxTokens,
+    [maxTokensParam]: options.maxTokens,
     stream: options.stream ?? false,
+    ...extraBody,
   };
 
   if (options.stream) {

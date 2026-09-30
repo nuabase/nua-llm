@@ -20,8 +20,9 @@ export type TestMode = { name: string } & (
  * - openrouter: Access to many models, requires OPENROUTER_API_KEY
  * - cerebras: Fast inference, requires CEREBRAS_API_KEY
  * - gemini: Google's models, requires GEMINI_API_KEY
+ * - deepseek: DeepSeek's models, requires DEEPSEEK_API_KEY
  */
-type DirectProvider = 'groq' | 'openrouter' | 'cerebras' | 'gemini';
+type DirectProvider = 'groq' | 'openrouter' | 'cerebras' | 'gemini' | 'deepseek';
 
 // Each agent's model for tests: Claude Code's fastest model, and the default model for
 // Codex and Pi (Pi needs its own `provider/id` name, which differs per machine).
@@ -48,7 +49,8 @@ export function getTestModes(): TestMode[] {
     process.env.GROQ_API_KEY ||
     process.env.OPENROUTER_API_KEY ||
     process.env.CEREBRAS_API_KEY ||
-    process.env.GEMINI_API_KEY;
+    process.env.GEMINI_API_KEY ||
+    process.env.DEEPSEEK_API_KEY;
 
   if (!process.env.SKIP_DIRECT_TESTS && hasDirectApiKey) {
     modes.push({ name: 'direct', kind: 'direct' });
@@ -76,7 +78,7 @@ function localAgentsToTest(): (LocalAgentId | 'auto')[] {
  * Creates a Nua client for the specified test mode.
  *
  * Gateway mode: Requires NUABASE_API_URL and NUABASE_API_KEY for a running Nuabase API
- * Direct mode: Requires one of GROQ_API_KEY, OPENROUTER_API_KEY, CEREBRAS_API_KEY, or GEMINI_API_KEY
+ * Direct mode: Requires one of GROQ_API_KEY, OPENROUTER_API_KEY, CEREBRAS_API_KEY, GEMINI_API_KEY, or DEEPSEEK_API_KEY
  * Local-agent mode: Requires that agent installed and logged in on this machine
  */
 export async function createTestClient(mode: TestMode): Promise<Nua> {
@@ -103,9 +105,10 @@ function createDirectClient(): Nua {
     defaultModel: string;
   }> = [
     { provider: 'groq', envKey: 'GROQ_API_KEY', defaultModel: 'openai/gpt-oss-120b' },
-    { provider: 'openrouter', envKey: 'OPENROUTER_API_KEY', defaultModel: 'z-ai/glm-5.2' },
+    { provider: 'openrouter', envKey: 'OPENROUTER_API_KEY', defaultModel: 'z-ai/glm-5.3-flash' },
     { provider: 'cerebras', envKey: 'CEREBRAS_API_KEY', defaultModel: 'qwen-3.8-27b' },
-    { provider: 'gemini', envKey: 'GEMINI_API_KEY', defaultModel: 'gemini-2.5-flash' },
+    { provider: 'gemini', envKey: 'GEMINI_API_KEY', defaultModel: 'gemini-3.8-flash' },
+    { provider: 'deepseek', envKey: 'DEEPSEEK_API_KEY', defaultModel: 'deepseek-flash' },
   ];
 
   for (const config of providerConfigs) {
@@ -126,7 +129,7 @@ function createDirectClient(): Nua {
   }
 
   throw new Error(
-    'Direct mode requires one of: GROQ_API_KEY, OPENROUTER_API_KEY, CEREBRAS_API_KEY, or GEMINI_API_KEY. ' +
+    'Direct mode requires one of: GROQ_API_KEY, OPENROUTER_API_KEY, CEREBRAS_API_KEY, GEMINI_API_KEY, or DEEPSEEK_API_KEY. ' +
       'Set SKIP_DIRECT_TESTS=1 to skip direct mode tests.'
   );
 }

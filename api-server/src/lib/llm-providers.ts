@@ -8,6 +8,7 @@ export function getConfiguredProviderIds(): Set<LlmProviderId> {
   if (config.llm.groqApiKey) providers.add("groq");
   if (config.llm.openRouterApiKey) providers.add("openrouter");
   if (config.llm.geminiApiKey) providers.add("gemini");
+  if (config.llm.deepseekApiKey) providers.add("deepseek");
 
   return providers;
 }

@@ -19,6 +19,17 @@ describe("resolveModelInput", () => {
     });
   });
 
+  it("prefers native DeepSeek for the deepseek alias, falling back to OpenRouter", () => {
+    expect(resolveModelInput({ alias: "deepseek" }, configured("deepseek", "openrouter"))).toEqual({
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+    });
+    expect(resolveModelInput({ alias: "deepseek" }, configured("openrouter"))).toEqual({
+      provider: "openrouter",
+      model: "deepseek/deepseek-v4-pro-0813",
+    });
+  });
+
   it("rejects an alias when none of its providers are configured", () => {
     const result = resolveModelInput({ alias: "sonnet" }, configured("groq"));
 
@@ -31,18 +42,18 @@ describe("resolveModelInput", () => {
   it("accepts explicit provider-native model names", () => {
     expect(
       resolveModelInput(
-        { provider: "openrouter", model: " z-ai/glm-5.2 " },
+        { provider: "openrouter", model: " z-ai/glm-5.3-flash " },
         configured("openrouter"),
       ),
     ).toEqual({
       provider: "openrouter",
-      model: "z-ai/glm-5.2",
+      model: "z-ai/glm-5.3-flash",
     });
   });
 
   it("rejects unknown providers", () => {
     const result = resolveModelInput(
-      { provider: "unknown", model: "z-ai/glm-5.2" } as never,
+      { provider: "unknown", model: "z-ai/glm-5.3-flash" } as never,
       configured("openrouter"),
     );
 
@@ -54,7 +65,7 @@ describe("resolveModelInput", () => {
 
   it("rejects unconfigured explicit providers", () => {
     const result = resolveModelInput(
-      { provider: "openrouter", model: "z-ai/glm-5.2" },
+      { provider: "openrouter", model: "z-ai/glm-5.3-flash" },
       configured("groq"),
     );
 
@@ -78,7 +89,7 @@ describe("resolveModelInput", () => {
 
   it("rejects Gemini resource-path-shaped model names", () => {
     const result = resolveModelInput(
-      { provider: "gemini", model: "models/gemini-2.5-flash" },
+      { provider: "gemini", model: "models/gemini-3.8-flash" },
       configured("gemini"),
     );
 

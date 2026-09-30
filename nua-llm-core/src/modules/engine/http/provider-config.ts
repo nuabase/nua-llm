@@ -16,6 +16,7 @@ export const LLM_PROVIDER_IDS = [
   "cerebras",
   "gemini",
   "openrouter",
+  "deepseek",
 ] as const;
 
 export type LlmProviderId = (typeof LLM_PROVIDER_IDS)[number];
@@ -178,8 +179,21 @@ export const normalizeGeminiUsage = (
   };
 };
 
+type OpenAiStyleDialect = {
+  /** Some APIs (DeepSeek) accept only the older `max_tokens` parameter. */
+  maxTokensParam?: "max_completion_tokens" | "max_tokens";
+  /** Provider-specific fields merged into every request body. */
+  extraBody?: Record<string, unknown>;
+};
+
 const buildOpenAiStyleRequest =
-  (baseUrl: string) =>
+  (
+    baseUrl: string,
+    {
+      maxTokensParam = "max_completion_tokens",
+      extraBody,
+    }: OpenAiStyleDialect = {},
+  ) =>
   (
     {
       prompt,
@@ -201,10 +215,11 @@ const buildOpenAiStyleRequest =
       messages,
       model,
       temperature: 0.6,
-      max_completion_tokens: maxTokens,
+      [maxTokensParam]: maxTokens,
       top_p: 1,
       stream: false,
       stop: null,
+      ...extraBody,
       ...(responseSchema && {
         response_format: {
           type: "json_schema",
@@ -416,6 +431,13 @@ const parseGeminiResponse = async (
   }
 };
 
+/**
+ * DeepSeek thinks by default, and its reasoning counts against `max_tokens`,
+ * which can leave a cast with no answer. Thinking with tool calls also requires
+ * sending `reasoning_content` back each turn, which the agent loop doesn't keep.
+ */
+export const deepseekRequestFields = { thinking: { type: "disabled" } };
+
 export const providerConfigs: Record<LlmProviderId, ProviderConfig> = {
   groq: {
     providerId: "groq",
@@ -456,5 +478,18 @@ export const providerConfigs: Record<LlmProviderId, ProviderConfig> = {
       "https://openrouter.ai/api/v1/chat/completions",
     ),
     parseResponse: parseOpenAiGPT5ThinkingStyleResponse("OpenRouter"),
+  },
+  deepseek: {
+    providerId: "deepseek",
+    apiOperation: "chat/completions",
+    errorLabel: "DeepSeek",
+    // DeepSeek offers only `json_object` mode, not strict `json_schema`, so no
+    // model enforces cast schemas natively.
+    // https://api-docs.deepseek.com/api/create-chat-completion
+    buildRequest: buildOpenAiStyleRequest(
+      "https://api.deepseek.com/chat/completions",
+      { maxTokensParam: "max_tokens", extraBody: deepseekRequestFields },
+    ),
+    parseResponse: parseOpenAiStyleResponse("DeepSeek"),
   },
 };

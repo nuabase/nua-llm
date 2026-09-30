@@ -11,7 +11,7 @@ default `{ "alias": "fast" }`.
 
 ```json
 {
-  "model": { "provider": "openrouter", "model": "z-ai/glm-5.2" }
+  "model": { "provider": "openrouter", "model": "z-ai/glm-5.3-flash" }
 }
 ```
 

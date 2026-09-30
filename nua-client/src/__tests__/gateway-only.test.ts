@@ -96,7 +96,7 @@ describe('gateway-only features', () => {
       const headers = await getAuthHeaders();
       const specifiedModel = {
         provider: 'openrouter' as const,
-        model: 'anthropic/claude-sonnet-4.6',
+        model: 'anthropic/claude-sonnet-5.5',
       };
 
       const response = await nua.get('Return the number 99', {
@@ -170,7 +170,7 @@ describe('gateway-only features', () => {
     const NumberSchema = z.number();
     const specifiedModel = {
       provider: 'openrouter' as const,
-      model: 'anthropic/claude-sonnet-4.6',
+      model: 'anthropic/claude-sonnet-5.5',
     };
 
     const response = await nua.get('Return the number 42', {

@@ -1,6 +1,6 @@
 import { Logger } from "../../lib/logger";
 import { callProvider, ProviderTarget } from "../engine/http/provider-call";
-import { ProviderRequestBase, providerConfigs } from "../engine/http/provider-config";
+import { deepseekRequestFields, ProviderRequestBase, providerConfigs } from "../engine/http/provider-config";
 import {
   buildGeminiAgenticRequest,
   buildOpenAiAgenticRequest,
@@ -91,6 +91,11 @@ function agentCodec({ provider, apiKey }: ProviderTarget): AgentCodec {
       return openAiStyleCodec("https://api.cerebras.ai/v1/chat/completions", apiKey, errorLabel);
     case "openrouter":
       return openAiStyleCodec("https://openrouter.ai/api/v1/chat/completions", apiKey, errorLabel);
+    case "deepseek":
+      return openAiStyleCodec("https://api.deepseek.com/chat/completions", apiKey, errorLabel, {
+        maxTokensParam: "max_tokens",
+        extraBody: deepseekRequestFields,
+      });
     case "gemini":
       return {
         buildRequest: (options) => buildGeminiAgenticRequest(options, apiKey),
@@ -100,9 +105,14 @@ function agentCodec({ provider, apiKey }: ProviderTarget): AgentCodec {
   }
 }
 
-function openAiStyleCodec(url: string, apiKey: string, errorLabel: string): AgentCodec {
+function openAiStyleCodec(
+  url: string,
+  apiKey: string,
+  errorLabel: string,
+  dialect?: Parameters<typeof buildOpenAiAgenticRequest>[3],
+): AgentCodec {
   return {
-    buildRequest: (options) => buildOpenAiAgenticRequest(options, url, apiKey),
+    buildRequest: (options) => buildOpenAiAgenticRequest(options, url, apiKey, dialect),
     parseResponse: (response) => parseOpenAiAgenticResponse(response, errorLabel),
     parseStreamingResponse: (response, onEvent) =>
       streamOpenAiAgenticResponse(response, errorLabel, onEvent),

@@ -55,3 +55,4 @@ Direct mode requires one of these API keys:
 - `OPENROUTER_API_KEY`
 - `CEREBRAS_API_KEY`
 - `GEMINI_API_KEY`
+- `DEEPSEEK_API_KEY`

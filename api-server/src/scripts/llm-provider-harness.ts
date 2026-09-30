@@ -19,7 +19,7 @@
  *
  * How to run it:
  *   - Ensure the relevant API keys are set (e.g. `GROQ_API_KEY`, `CEREBRAS_API_KEY`,
- *     `OPENROUTER_API_KEY`, `GEMINI_API_KEY` for future Gemini support).
+ *     `OPENROUTER_API_KEY`, `GEMINI_API_KEY`, `DEEPSEEK_API_KEY`).
  *   - Execute `npm run llm:harness -- [options]`. Run with `--help` to see the CLI
  *     options for overriding prompt/max tokens, filtering aliases/providers, and setting
  *     the output file.
@@ -56,6 +56,7 @@ const PROVIDER_ENV_VARS: Record<LlmProviderId, string> = {
   cerebras: "CEREBRAS_API_KEY",
   gemini: "GEMINI_API_KEY",
   openrouter: "OPENROUTER_API_KEY",
+  deepseek: "DEEPSEEK_API_KEY",
 };
 
 type HarnessRunStatus =
@@ -273,7 +274,7 @@ function printCliHelp(): void {
       '  --assistant-prefill "..."      Prefill an assistant response before the real call.',
       "  --max-tokens <number>          Max tokens to request (default 256).",
       "  --aliases alias1,alias2        Only run for specific aliases.",
-      "  --provider openrouter --model z-ai/glm-5.2",
+      "  --provider openrouter --model z-ai/glm-5.3-flash",
       "                                Run one explicit provider-native model.",
       "  --providers provider1,provider2 Only run alias targets for specific providers.",
       "  --output ./path/to/file.json   Where to persist the run artifact (defaults to logs/).",

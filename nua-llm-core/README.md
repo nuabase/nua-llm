@@ -18,6 +18,7 @@ const client = new NuaLlmClient(
       cerebras: { apiKey: process.env.CEREBRAS_API_KEY },
       openrouter: { apiKey: process.env.OPENROUTER_API_KEY },
       gemini: { apiKey: process.env.GEMINI_API_KEY },
+      deepseek: { apiKey: process.env.DEEPSEEK_API_KEY },
     },
   }),
 );
@@ -70,7 +71,7 @@ const rows = [
 ];
 
 const result = await client.castArray({
-  model: { provider: "openrouter", model: "anthropic/claude-sonnet-4.6" },
+  model: { provider: "openrouter", model: "anthropic/claude-sonnet-5.5" },
   input: {
     prompt: "Convert price list to structured objects",
     data: rows,
@@ -106,7 +107,7 @@ if (result.success) {
 The client holds one engine router, which decides where each call runs. Every router answers the same question: for this call's model choice, which engine runs it, and on which model, or why no engine can. Create one of:
 
 *   `providerEngines(config)`, for LLM providers' HTTP APIs:
-    *   `providers`: API keys by provider. Supported providers: `groq`, `cerebras`, `gemini`, `openrouter`. Providers without a key are never used.
+    *   `providers`: API keys by provider. Supported providers: `groq`, `cerebras`, `gemini`, `openrouter`, `deepseek`. Providers without a key are never used.
     *   `model`: Optional default model input. Defaults to `{ alias: "fast" }`.
     *   `logger`: Instance implementing the `Logger` interface (debug, info, warn, error). Defaults to `ConsoleLogger`.
 *   `localAgent(config)` or `await findLocalAgent(options)` from `nua-llm-core/local-agent`, for a coding-agent CLI on this machine (Claude Code, Codex, or Pi), run with the user's own login. Node.js only:
@@ -130,7 +131,7 @@ The router's logger receives each call's log lines, and the client logs its retr
 
 Performs a single LLM call to extract an object matching the schema.
 
-*   `model`: Optional typed model input. Use `{ alias: "fast" }` for a product alias, or `{ provider: "openrouter", model: "z-ai/glm-5.2" }` for a provider-native model. If omitted, the router's default is used.
+*   `model`: Optional typed model input. Use `{ alias: "fast" }` for a product alias, or `{ provider: "openrouter", model: "z-ai/glm-5.3-flash" }` for a provider-native model. If omitted, the router's default is used.
 *   `input.prompt`: Instructions for the extraction.
 *   `input.data`: The context data (string or object) to process.
 *   `output.name`: Name of the entity (helps LLM context).

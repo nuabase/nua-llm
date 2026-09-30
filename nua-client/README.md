@@ -199,7 +199,7 @@ Creates a client that runs casts in this process instead of through the gateway.
 
 With API keys for LLM providers:
 
-- `providers: { groq?: { apiKey: string }, cerebras?: { apiKey: string }, gemini?: { apiKey: string }, openrouter?: { apiKey: string } }` – Provider credentials.
+- `providers: { groq?: { apiKey: string }, cerebras?: { apiKey: string }, gemini?: { apiKey: string }, openrouter?: { apiKey: string }, deepseek?: { apiKey: string } }` – Provider credentials.
 - `model?: ModelInput` – Optional default model. Omit it to use `{ alias: 'fast' }`.
 
 Model inputs are objects, not provider-prefixed strings:
@@ -207,7 +207,7 @@ Model inputs are objects, not provider-prefixed strings:
 ```ts
 await nua.get('Extract the company name', {
   output: { name: 'companyName', schema: z.string() },
-  model: { provider: 'openrouter', model: 'z-ai/glm-5.2' },
+  model: { provider: 'openrouter', model: 'z-ai/glm-5.3-flash' },
 });
 
 await nua.get('Extract the company name', {
@@ -247,7 +247,7 @@ The agent is set up once, when you create it. If you install an agent or log in 
 
 Options for both:
 
-- `model?: string` – The agent's own model name, e.g. `'haiku'` for Claude Code, for calls that name no model. Defaults to the agent's default. Per-call `model: { alias }` works for aliases the agent understands (`haiku`, `sonnet`, `opus` for Claude Code). Codex and Pi have no aliases: pass one of their own model names, and for Pi a `provider/id` name such as `'openrouter/z-ai/glm-5.2'`.
+- `model?: string` – The agent's own model name, e.g. `'haiku'` for Claude Code, for calls that name no model. Defaults to the agent's default. Per-call `model: { alias }` works for aliases the agent understands (`haiku`, `sonnet`, `opus` for Claude Code). Codex and Pi have no aliases: pass one of their own model names, and for Pi a `provider/id` name such as `'openrouter/z-ai/glm-5.3-flash'`.
 - `timeoutMs?: number` – Per-call limit. Defaults to `180000`.
 - `concurrency?: number` – Maximum agent processes at once. Defaults to `2`.
 - `auth?: 'subscription' | 'inherit'` – `subscription` (default) hides `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` and similar variables from the agent so it bills the logged-in plan rather than an API key.

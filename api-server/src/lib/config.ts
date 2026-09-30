@@ -44,6 +44,7 @@ export const config = {
     cerebrasApiKey: process.env.CEREBRAS_API_KEY as string,
     openRouterApiKey: process.env.OPENROUTER_API_KEY as string,
     geminiApiKey: process.env.GEMINI_API_KEY as string | undefined,
+    deepseekApiKey: process.env.DEEPSEEK_API_KEY as string | undefined,
   },
 
   dbLlmCacheUrl: process.env.DB_LLM_CACHE_URL as string,

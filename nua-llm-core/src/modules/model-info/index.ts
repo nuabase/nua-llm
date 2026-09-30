@@ -17,6 +17,7 @@ export type ModelAliasName =
   | "opus"
   | "haiku"
   | "kimi"
+  | "deepseek"
   | "gpt";
 
 export type ModelInput = ProviderModel | { alias: ModelAliasName };
@@ -25,29 +26,33 @@ export const MODEL_ALIASES: Record<ModelAliasName, ProviderModel[]> = {
   fast: [
     { provider: "cerebras", model: "qwen-3.8-27b" },
     { provider: "groq", model: "openai/gpt-oss-120b" },
-    { provider: "openrouter", model: "z-ai/glm-5.2" },
+    { provider: "openrouter", model: "z-ai/glm-5.3-flash" },
   ],
   gemini: [
-    { provider: "gemini", model: "gemini-2.5-flash" },
-    { provider: "openrouter", model: "google/gemini-2.5-flash" },
+    { provider: "gemini", model: "gemini-3.8-flash" },
+    { provider: "openrouter", model: "google/gemini-3.8-flash" },
   ],
   qwen: [
-    { provider: "openrouter", model: "qwen/qwen3-vl-235b-a22b-instruct" },
+    { provider: "openrouter", model: "qwen/qwen3.8-2.4t-a95b" },
   ],
   sonnet: [
-    { provider: "openrouter", model: "anthropic/claude-sonnet-4.6" },
+    { provider: "openrouter", model: "anthropic/claude-sonnet-5.5" },
   ],
   opus: [
-    { provider: "openrouter", model: "anthropic/claude-opus-4.7" },
+    { provider: "openrouter", model: "anthropic/claude-opus-5.5" },
   ],
   haiku: [
     { provider: "openrouter", model: "anthropic/claude-haiku-4.5" },
   ],
   kimi: [
-    { provider: "openrouter", model: "moonshotai/kimi-k2.7-code" },
+    { provider: "openrouter", model: "moonshotai/kimi-k3" },
+  ],
+  deepseek: [
+    { provider: "deepseek", model: "deepseek-v4-pro" },
+    { provider: "openrouter", model: "deepseek/deepseek-v4-pro-0813" },
   ],
   gpt: [
-    { provider: "openrouter", model: "openai/gpt-5" },
+    { provider: "openrouter", model: "openai/gpt-6.1-sol" },
   ],
 };
 
@@ -98,7 +103,7 @@ function validateProviderModel(
 
   if (input.provider === "gemini" && model.startsWith("models/")) {
     return validationError(
-      'Gemini model names must use bare model IDs, for example "gemini-2.5-flash", not "models/gemini-2.5-flash".',
+      'Gemini model names must use bare model IDs, for example "gemini-3.8-flash", not "models/gemini-3.8-flash".',
     );
   }
 

@@ -11,10 +11,11 @@ const PROVIDER_TESTS: Array<{
 }> = [
   { provider: "groq", model: { provider: "groq", model: "openai/gpt-oss-120b" }, envKey: "GROQ_API_KEY" },
   { provider: "cerebras", model: { provider: "cerebras", model: "qwen-3.8-27b" }, envKey: "CEREBRAS_API_KEY" },
-  { provider: "gemini", model: { provider: "gemini", model: "gemini-2.5-flash" }, envKey: "GEMINI_API_KEY" },
-  { provider: "openrouter", model: { provider: "openrouter", model: "z-ai/glm-5.2" }, envKey: "OPENROUTER_API_KEY" },
-  { provider: "openrouter", model: { provider: "openrouter", model: "moonshotai/kimi-k2.7-code" }, envKey: "OPENROUTER_API_KEY" },
-  { provider: "openrouter", model: { provider: "openrouter", model: "anthropic/claude-opus-4.7" }, envKey: "OPENROUTER_API_KEY" },
+  { provider: "gemini", model: { provider: "gemini", model: "gemini-3.8-flash" }, envKey: "GEMINI_API_KEY" },
+  { provider: "openrouter", model: { provider: "openrouter", model: "z-ai/glm-5.3-flash" }, envKey: "OPENROUTER_API_KEY" },
+  { provider: "deepseek", model: { provider: "deepseek", model: "deepseek-flash" }, envKey: "DEEPSEEK_API_KEY" },
+  { provider: "openrouter", model: { provider: "openrouter", model: "moonshotai/kimi-k3" }, envKey: "OPENROUTER_API_KEY" },
+  { provider: "openrouter", model: { provider: "openrouter", model: "anthropic/claude-opus-5.5" }, envKey: "OPENROUTER_API_KEY" },
   { provider: "openrouter", model: { provider: "openrouter", model: "anthropic/claude-haiku-4.5" }, envKey: "OPENROUTER_API_KEY" },
 ];
 

@@ -155,7 +155,7 @@ describe("providerEngines", () => {
   });
 
   it("cannot route a model whose provider has no API key", () => {
-    expect(providers.route({ provider: "gemini", model: "gemini-2.5-flash" })).toMatchObject({
+    expect(providers.route({ provider: "gemini", model: "gemini-3.8-flash" })).toMatchObject({
       kind: "unroutable",
       message: expect.stringMatching(/not configured/),
     });
