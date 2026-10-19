@@ -1,6 +1,7 @@
 {
   "name": "nua-llm-caching",
   "version": "1.0.0",
+  "private": true,
   "description": "LLM Caching Library for Nua",
   "packageManager": "pnpm@10.20.0",
   "main": "dist/index.js",

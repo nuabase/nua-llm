@@ -1,6 +1,7 @@
 {
   "name": "api",
   "version": "1.0.0",
+  "private": true,
   "description": "Nuabase Node web server for llm transforms",
   "packageManager": "pnpm@10.20.0",
   "main": "dist/index.js",

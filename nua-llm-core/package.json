@@ -1,6 +1,7 @@
 {
   "name": "nua-llm-core",
   "version": "1.0.0",
+  "private": true,
   "description": "Nua LLM Core Library",
   "packageManager": "pnpm@10.20.0",
   "main": "dist/index.js",

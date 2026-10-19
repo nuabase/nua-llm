@@ -7,7 +7,7 @@ Two packages are published:
 | `nuabase`          | `nua-client/`  | Runs casts in your process. Bundles `nua-llm-core`, so a change to either needs a release. |
 | `@nuabase/gateway` | `nua-gateway/` | The Nuabase API client. Does not use `nua-llm-core`.                                    |
 
-`scripts/packages.mjs` lists them, with the paths whose changes each one ships. The other workspace packages are not published.
+`scripts/packages.mjs` lists them, with the paths whose changes each one ships. The other workspace packages are marked `"private": true`, so npm refuses to publish them.
 
 A release happens in three steps:
 

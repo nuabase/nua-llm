@@ -6,8 +6,9 @@ const ALLOWED_FILES = ['CHANGELOG.md', 'LICENSE', 'README.md', 'package.json'];
 
 // nuabase never sends data to the Nuabase API; that client is the separate
 // @nuabase/gateway package. A built file that names the API means gateway code
-// has crept back in.
-const NUABASE_API_REFERENCE = /api\.nuabase\.com|NUABASE_API/;
+// has been bundled in, and one that names the package means it is imported:
+// rollup leaves a dependency's import in place, without the API's URL.
+const NUABASE_API_REFERENCE = /api\.nuabase\.com|NUABASE_API|@nuabase\/gateway/;
 
 async function packCheck() {
   const result = await $`npm pack --dry-run --json`;
@@ -41,7 +42,7 @@ async function packCheck() {
 
   if (filesNamingTheApi.length > 0) {
     signale.error(
-      'These packed files refer to the Nuabase API. nuabase must not call it; that code belongs in @nuabase/gateway.'
+      'These packed files refer to the Nuabase API or import @nuabase/gateway. nuabase must not call the API; that code belongs in @nuabase/gateway.'
     );
     filesNamingTheApi.forEach((file) => signale.log(file));
     process.exit(1);
