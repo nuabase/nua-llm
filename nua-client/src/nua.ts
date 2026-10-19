@@ -1,9 +1,30 @@
-import { DirectBackend, DirectConfig } from './backend/direct';
-import { CastResult, LlmBackend } from './backend/types';
-import type { ModelInput } from 'nua-llm-core';
+import { CastResult } from './types';
+import { listSchema, NuaLlmClient, providerEngines } from 'nua-llm-core';
+import type {
+  AnswerOrigin,
+  CastResult as CoreCastResult,
+  EngineRouter,
+  LlmProviderId,
+  ModelInput,
+} from 'nua-llm-core';
+import type { LocalAgent } from 'nua-llm-core/local-agent';
 import { z } from 'zod';
 
 // ========== Public Types ==========
+
+/** API keys for the LLM providers direct mode may call. */
+export type ProviderApiKeys = {
+  [key in LlmProviderId]?: { apiKey: string };
+};
+
+/**
+ * Either `providers`: API keys for LLM providers, with an optional default `model`.
+ * Or `localAgent`: a coding-agent CLI on this machine, from `localAgent()` or
+ * `findLocalAgent()` in "nuabase/local-agent".
+ */
+export type DirectConfig =
+  | { providers: ProviderApiKeys; model?: ModelInput; localAgent?: never }
+  | { localAgent: LocalAgent; providers?: never; model?: never };
 
 export type OutputDef<TSchema extends z.ZodTypeAny> = {
   name: string;
@@ -37,10 +58,10 @@ export type ListResultRow<TSchema extends z.ZodTypeAny, PrimaryKey extends strin
 // ========== Nua Class ==========
 
 export class Nua {
-  private readonly backend: LlmBackend;
+  private readonly client: NuaLlmClient;
 
-  private constructor(backend: LlmBackend) {
-    this.backend = backend;
+  private constructor(config: DirectConfig) {
+    this.client = new NuaLlmClient(enginesFor(config));
   }
 
   /**
@@ -49,7 +70,7 @@ export class Nua {
    * `findLocalAgent()` from "nuabase/local-agent").
    */
   static direct(config: DirectConfig): Nua {
-    return new Nua(new DirectBackend(config));
+    return new Nua(config);
   }
 
   // ========== get() - Single Value Operations ==========
@@ -73,13 +94,13 @@ export class Nua {
     const outputName = options?.output?.name ?? 'result';
     const jsonSchema = z.toJSONSchema(outputSchema);
 
-    return this.backend.castValue({
-      prompt,
-      data: options?.input ?? null,
-      outputName,
-      outputSchema: jsonSchema,
+    const startTime = Date.now();
+    const result = await this.client.castValue({
       model: options?.model,
+      input: { prompt, data: options?.input ?? null },
+      output: { name: outputName, schema: jsonSchema },
     });
+    return toDirectResult(result, Date.now() - startTime);
   }
 
   // ========== list() - Array Operations ==========
@@ -104,15 +125,48 @@ export class Nua {
       throw new TypeError('primaryKey must be a non-empty string');
     }
 
-    const jsonSchema = z.toJSONSchema(options.output.schema);
-
-    return this.backend.castArray({
-      prompt,
-      data: options.input,
+    const output = listSchema(z.toJSONSchema(options.output.schema), {
       primaryKey: options.primaryKey,
       outputName: options.output.name,
-      outputSchema: jsonSchema,
-      model: options.model,
     });
+
+    const startTime = Date.now();
+    const result = await this.client.castArray<ListResultRow<TSchema, PrimaryKey>>({
+      model: options.model,
+      input: { prompt, data: options.input },
+      output,
+    });
+    return toDirectResult(result, Date.now() - startTime);
+  }
+}
+
+function enginesFor(config: DirectConfig): EngineRouter {
+  if (config.localAgent) {
+    return config.localAgent;
+  }
+  return providerEngines({ providers: config.providers, model: config.model });
+}
+
+function toDirectResult<T>(result: CoreCastResult<T>, latencyMs: number): CastResult<T> {
+  if (!result.success) {
+    return { success: false, error: result.error, source: 'direct', latencyMs };
+  }
+  return {
+    success: true,
+    data: result.data,
+    usage: result.usage,
+    model: describeModel(result.origin),
+    latencyMs,
+    source: 'direct',
+    meta: { ...result.origin, schemaEnforcement: result.schemaEnforcement },
+  };
+}
+
+function describeModel(origin: AnswerOrigin): string {
+  switch (origin.engine) {
+    case 'http':
+      return `${origin.provider}:${origin.model}`;
+    case 'local-agent':
+      return `${origin.agent}:${origin.model ?? 'default'}`;
   }
 }

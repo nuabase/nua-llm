@@ -1,18 +1,16 @@
 // Main class
 export { Nua } from './nua';
-export type { OutputDef, GetOptions, ListOptions, ListResultRow } from './nua';
-
-// Backend types (for advanced users)
 export type {
-  LlmBackend,
-  CastResult,
-  CastValueParams,
-  CastArrayParams,
-  NormalizedUsage,
-  DirectMeta,
-  CastResultSource,
-} from './backend/types';
-export type { DirectConfig, ProviderApiKeys } from './backend/direct';
+  OutputDef,
+  GetOptions,
+  ListOptions,
+  ListResultRow,
+  DirectConfig,
+  ProviderApiKeys,
+} from './nua';
+
+// Result types
+export type { CastResult, NormalizedUsage, DirectMeta, CastResultSource } from './types';
 export type { AnswerOrigin, LocalAgentId, ModelInput, SchemaEnforcementKind } from 'nua-llm-core';
 
 // Re-export zod for convenience
