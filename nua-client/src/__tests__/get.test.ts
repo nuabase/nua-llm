@@ -1,11 +1,5 @@
 import type { Nua } from '../nua';
-import {
-  createTestClient,
-  expectedDirectMeta,
-  expectedSource,
-  getTestModes,
-  testTimeoutMs,
-} from './helpers';
+import { createTestClient, expectedDirectMeta, getTestModes, testTimeoutMs } from './helpers';
 import z from 'zod';
 
 const testModes = getTestModes();
@@ -96,8 +90,7 @@ Australia`;
 
       expect(response.data).toBe(10);
 
-      // source should match the mode
-      expect(response.source).toBe(expectedSource(mode));
+      expect(response.source).toBe('direct');
 
       // model should be a non-empty string
       expect(response.model).toBeDefined();
@@ -112,20 +105,8 @@ Australia`;
       // meta should exist
       expect(response.meta).toBeDefined();
 
-      // gateway-specific meta fields
-      if (response.source === 'gateway') {
-        expect(response.meta.requestId).toBeDefined();
-        expect(typeof response.meta.requestId).toBe('string');
-        expect(typeof response.meta.cached).toBe('boolean');
-        expect(response.meta.llmUsage).toBeDefined();
-        expect(response.meta.cacheUsage).toBeDefined();
-      }
-
-      // direct-specific meta fields
-      if (response.source === 'direct') {
-        expect(response.meta).toMatchObject(expectedDirectMeta(mode));
-        expect(['in-prompt', 'native']).toContain(response.meta.schemaEnforcement);
-      }
+      expect(response.meta).toMatchObject(expectedDirectMeta(mode));
+      expect(['in-prompt', 'native']).toContain(response.meta.schemaEnforcement);
     },
     timeoutMs
   );

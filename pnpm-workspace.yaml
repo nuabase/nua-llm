@@ -3,3 +3,4 @@ packages:
   - nua-llm-core
   - nua-llm-caching
   - nua-client
+  - nua-gateway

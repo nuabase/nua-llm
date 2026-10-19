@@ -4,12 +4,10 @@ import type { LocalAgentId, ModelInput } from 'nua-llm-core';
 
 /**
  * One way of running casts that the shared tests exercise:
- * - gateway: the Nuabase API at NUABASE_API_URL
  * - direct: LLM providers' APIs, with API keys
  * - local-agent: a coding-agent CLI on this machine, with its own login
  */
 export type TestMode = { name: string } & (
-  | { kind: 'gateway' }
   | { kind: 'direct' }
   | { kind: 'local-agent'; agent: LocalAgentId | 'auto' }
 );
@@ -34,16 +32,11 @@ const LOCAL_AGENT_TEST_MODELS: Record<LocalAgentId, string | undefined> = {
 
 /**
  * Returns the modes to run the shared tests in.
- * - gateway, unless SKIP_GATEWAY_TESTS is set.
  * - direct, when a provider API key is set, unless SKIP_DIRECT_TESTS is set.
  * - one local-agent mode per agent in NUA_LOCAL_AGENTS (e.g. "claude-code,codex", or "auto").
  */
 export function getTestModes(): TestMode[] {
   const modes: TestMode[] = [];
-
-  if (!process.env.SKIP_GATEWAY_TESTS) {
-    modes.push({ name: 'gateway', kind: 'gateway' });
-  }
 
   const hasDirectApiKey =
     process.env.GROQ_API_KEY ||
@@ -58,6 +51,12 @@ export function getTestModes(): TestMode[] {
 
   for (const agent of localAgentsToTest()) {
     modes.push({ name: `local-agent:${agent}`, kind: 'local-agent', agent });
+  }
+
+  if (modes.length === 0) {
+    throw new Error(
+      'No test mode to run: set a provider API key (see createDirectClient) or NUA_LOCAL_AGENTS.'
+    );
   }
 
   return modes;
@@ -77,14 +76,11 @@ function localAgentsToTest(): (LocalAgentId | 'auto')[] {
 /**
  * Creates a Nua client for the specified test mode.
  *
- * Gateway mode: Requires NUABASE_API_URL and NUABASE_API_KEY for a running Nuabase API
  * Direct mode: Requires one of GROQ_API_KEY, OPENROUTER_API_KEY, CEREBRAS_API_KEY, GEMINI_API_KEY, or DEEPSEEK_API_KEY
  * Local-agent mode: Requires that agent installed and logged in on this machine
  */
 export async function createTestClient(mode: TestMode): Promise<Nua> {
   switch (mode.kind) {
-    case 'gateway':
-      return Nua.gateway({});
     case 'direct':
       return createDirectClient();
     case 'local-agent':
@@ -134,16 +130,9 @@ function createDirectClient(): Nua {
   );
 }
 
-/** The result `source` a mode produces: local agents run through the direct backend. */
-export function expectedSource(mode: TestMode): 'gateway' | 'direct' {
-  return mode.kind === 'gateway' ? 'gateway' : 'direct';
-}
-
 /** The part of a direct result's `meta` that says which engine answered. */
 export function expectedDirectMeta(mode: TestMode): Record<string, unknown> {
   switch (mode.kind) {
-    case 'gateway':
-      return {};
     case 'direct':
       return { engine: 'http' };
     case 'local-agent':

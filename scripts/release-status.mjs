@@ -1,6 +1,7 @@
 // Prints the release state of this repository as one JSON object on stdout,
-// for the release train in ../sapporta-devtools. Only `nuabase` (nua-client)
-// is published; it bundles nua-llm-core, so changes to either count.
+// for the release train in ../sapporta-devtools: one entry per published
+// package in packages.mjs, `nuabase` (nua-client) and `@nuabase/gateway`
+// (nua-gateway). Each counts changes to its own tracked paths.
 //
 // This script only reads. It never commits, pushes or pulls.
 
@@ -8,19 +9,18 @@ import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { PUBLISHED_PACKAGES } from "./packages.mjs";
 
 const repoDir = join(dirname(fileURLToPath(import.meta.url)), "..");
-const clientDir = join(repoDir, "nua-client");
 const changesetDir = join(repoDir, ".changeset");
-const trackedPaths = ["nua-client", "nua-llm-core"];
 const bumpRank = { patch: 1, minor: 2, major: 3 };
 
 function git(args) {
   return execFileSync("git", args, { cwd: repoDir, encoding: "utf8" });
 }
 
-function readClientPackage() {
-  return JSON.parse(readFileSync(join(clientDir, "package.json"), "utf8"));
+function readPackage(dir) {
+  return JSON.parse(readFileSync(join(repoDir, dir, "package.json"), "utf8"));
 }
 
 // Asks npm whether name@version exists. A 404 means "not published"; every
@@ -90,9 +90,9 @@ function lastReleaseCommit() {
   return legacyRelease ? legacyRelease.hash : null;
 }
 
-// Commits since the last release that touch the published code, leaving out
-// commits that only change a CHANGELOG.md.
-function unnamedChanges() {
+// Commits since the last release that touch a package's tracked paths,
+// leaving out commits that only change a CHANGELOG.md.
+function unnamedChanges(trackedPaths) {
   const marker = lastReleaseCommit();
   const range = marker ? `${marker}..HEAD` : "HEAD";
   const out = git(["log", "--format=%x00%h%x09%s", "--name-only", range, "--", ...trackedPaths]);
@@ -113,28 +113,27 @@ function unnamedChanges() {
     .map(({ hash, subject }) => ({ hash, subject }));
 }
 
-function main() {
-  const pkg = readClientPackage();
+function packageStatus({ dir, trackedPaths }) {
+  const pkg = readPackage(dir);
   const bump = pendingBump(pkg.name);
 
-  const status = {
-    packages: [
-      {
-        name: pkg.name,
-        version: pkg.version,
-        published: isPublished(pkg.name, pkg.version),
-        dependencies: [
-          ...new Set([
-            ...Object.keys(pkg.dependencies ?? {}),
-            ...Object.keys(pkg.peerDependencies ?? {}),
-          ]),
-        ],
-        pendingBump: bump,
-        unnamedChanges: bump === null ? unnamedChanges() : [],
-      },
+  return {
+    name: pkg.name,
+    version: pkg.version,
+    published: isPublished(pkg.name, pkg.version),
+    dependencies: [
+      ...new Set([
+        ...Object.keys(pkg.dependencies ?? {}),
+        ...Object.keys(pkg.peerDependencies ?? {}),
+      ]),
     ],
+    pendingBump: bump,
+    unnamedChanges: bump === null ? unnamedChanges(trackedPaths) : [],
   };
+}
 
+function main() {
+  const status = { packages: PUBLISHED_PACKAGES.map(packageStatus) };
   process.stdout.write(`${JSON.stringify(status, null, 2)}\n`);
 }
 

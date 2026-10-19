@@ -6,7 +6,7 @@
   "type": "module",
   "author": "Jasim A Basheer <jasim@nuabase.com>",
   "engines": {
-    "node": ">=16.6.0"
+    "node": ">=18"
   },
   "keywords": [
     "typescript",
@@ -69,8 +69,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint --cache .",
     "jest": "jest",
-    "test": "pnpm run prettier:check && pnpm run typecheck && pnpm run lint && pnpm run jest && pnpm run build && pnpm run pack:test",
-    "release": "tsx scripts/release",
+    "test": "pnpm --filter nua-llm-core build && pnpm run prettier:check && pnpm run typecheck && pnpm run lint && pnpm run jest && pnpm run build && pnpm run pack:test",
     "knip": "knip"
   },
   "devDependencies": {

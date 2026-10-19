@@ -1,6 +1,6 @@
 ## Nuabase TypeScript SDK
 
-Nuabase turns LLM prompts into type-safe functions in under five lines of code. Set up your free account now at [Nuabase](https://nuabase.com).
+Nuabase turns LLM prompts into type-safe functions in under five lines of code.
 
 With Nuabase, you write a prompt, specify the output schema, and get back a well-typed function. You can invoke it with input data, like any other code in your application, and receive data that matches the exact schema you specified.
 
@@ -10,9 +10,9 @@ Example use-cases:
 - Enrich a list of food items with nutrition facts
 - Tag sales leads with more details about the company
 
-Behind the scenes, Nuabase runs the LLM transformation as async jobs, and once ready, call your server API with the results using Webhooks. It can also stream the result directly to your front-end using SSE. You can also see all requests and responses as they happen in the [Nuabase Console](https://console.nuabase.com). All outputs are guaranteed to match the schema you specified.
+This package runs every call in your own process: on LLM providers' APIs with your own API keys, or on a coding agent already installed on your machine (Claude Code, Codex or Pi). It never sends anything to Nuabase; see [Where your data goes](#where-your-data-goes). All outputs are validated against the schema you specified.
 
-One major reason I built Nuabase is the need for granular, row-level caching. For example, let's say you want to classify your bank transaction entries, and map them to your chart of accounts. With Nuabase's row-level caching, it will only send new entries to the LLM. Any specific entry that it has seen before will be returned from the cache. This also means you can make LLM requests multiple times with identical values, and after the first time, they will return immediately without needing to go through the LLM.
+The hosted Nuabase API, with row-level caching, async jobs delivered by webhook or SSE, and request logs in the [Nuabase Console](https://console.nuabase.com), has its own client: [`@nuabase/gateway`](https://www.npmjs.com/package/@nuabase/gateway).
 
 ## Usage at a glance
 
@@ -34,7 +34,7 @@ const LeadInsights = z.object({
 **3. Call the API.** Use `list()` for array operations:
 
 ```ts
-const nua = Nua.gateway({ apiKey: 'YOUR_API_KEY' });
+const nua = Nua.direct({ providers: { openrouter: { apiKey: 'YOUR_OPENROUTER_KEY' } } });
 
 const result = await nua.list('Classify each lead with industry and company_size bucket.', {
   input: leads,
@@ -59,9 +59,7 @@ console.log(result.data[0].leadInsights);
 npm install nuabase zod
 ```
 
-2. Get your API key from the [Nuabase Console](https://console.nuabase.com/dashboard/api-keys/new).
-
-3. Set `NUABASE_API_KEY` environment variable, or pass it directly in `Nua.gateway({ apiKey: "KEY" })`:
+2. Get an API key from one of the supported LLM providers (Groq, Cerebras, Gemini, OpenRouter or DeepSeek) and pass it to `Nua.direct({ providers })`. Or, in Node.js, use a coding agent that is installed and logged in on your machine, with no API key: see [Constructors](#constructors).
 
 ## Lead Enrichment Example
 
@@ -69,7 +67,7 @@ npm install nuabase zod
 import { Nua } from 'nuabase';
 import { z } from 'zod';
 
-const nua = Nua.gateway({ apiKey: 'API-KEY' });
+const nua = Nua.direct({ providers: { openrouter: { apiKey: process.env.OPENROUTER_API_KEY! } } });
 
 const LeadInsights = z.object({
   company_name: z.string(),
@@ -131,14 +129,16 @@ console.log(response.data);
 // ];
 ```
 
-The default invocation waits for completion and returns the full result. Use `nua.queueList()` to submit an asynchronous job and receive streaming updates via SSE.
+## Where your data goes
 
-## Why Nuabase
+Your prompt, input data and output schema go only to the engine you configure:
 
-- Type-safe from prompt to runtime: Zod schemas compile to JSON Schema, and the SDK re-validates every response before you see it.
-- Zero glue code: Nuabase runs the queueing, retries, webhooks, SSE streaming, and polling so your application code stays clean.
-- Built-in performance: granular caching, cost attribution, and usage metrics come for free on every request.
-- Production visibility: every run shows up in the Nuabase dashboard with logs, prompt/response history, and tracing ids.
+- With `providers`, to the APIs of the LLM providers you gave keys for, called directly from your process.
+- With `localAgent`, to the coding-agent CLI on your machine, which sends them on to its own vendor under your login.
+
+Nothing goes to Nuabase. This package contains no code that calls the Nuabase API, and its build fails if any appears. To use the hosted Nuabase API, install [`@nuabase/gateway`](https://www.npmjs.com/package/@nuabase/gateway).
+
+Zod schemas compile to JSON Schema, and the SDK validates every response against it before you see it.
 
 ## API Response
 
@@ -153,21 +153,12 @@ Every call returns a discriminated union. When `success` is `false`, you get an 
 | `usage`     | `{ promptTokens, completionTokens, totalTokens }`                     | Token usage statistics for the LLM request.        |
 | `model`     | `string`                                                              | The LLM model used for this request.               |
 | `latencyMs` | `number`                                                              | Request latency in milliseconds.                   |
-| `source`    | `'gateway'` \| `'direct'`                                             | Which backend processed the request.               |
-| `meta`      | `object`                                                              | Additional metadata (varies by source).            |
+| `source`    | `'direct'`                                                            | The request ran in this process.                   |
+| `meta`      | `object`                                                              | Which engine answered; see below.                  |
 
 `usage` also has `promptCacheReadTokens` and `promptCacheWriteTokens` when the provider reports them: prompt tokens it read from or wrote to its prompt cache. They are part of `promptTokens`. Cache reads are billed at a steep discount, so keep `prompt` the same on every call of a cast and pass anything that varies in `data`: the prompt and schema come first in what the model sees, and providers cache that repeated start. On Claude, a cast whose prompt never repeats pays a 25% premium on it.
 
-**Gateway-specific metadata** (`meta` when `source` is `'gateway'`):
-
-| Field        | Type      | Description                               |
-| ------------ | --------- | ----------------------------------------- |
-| `requestId`  | `string`  | Unique identifier for tracing.            |
-| `cached`     | `boolean` | Whether the result was served from cache. |
-| `llmUsage`   | `object`  | Token usage from LLM calls.               |
-| `cacheUsage` | `object`  | Token usage served from cache.            |
-
-**Direct-specific metadata** (`meta` when `source` is `'direct'`):
+**Metadata** (`meta`):
 
 | Field               | Type                         | Description                                                                                               |
 | ------------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------- |
@@ -183,21 +174,15 @@ Every call returns a discriminated union. When `success` is `false`, you get an 
 | ----------- | ------------------------- | ----------------------------------- |
 | `success`   | `false`                   | Indicates the request failed.       |
 | `error`     | `string`                  | Message describing the error.       |
-| `source`    | `'gateway'` \| `'direct'` | Which backend returned the error.   |
+| `source`    | `'direct'`                | The request ran in this process.    |
 | `latencyMs` | `number`                  | Time until failure in milliseconds. |
 
 ## SDK API
 
 ### Constructors
 
-**`Nua.gateway(config?)`**
-Creates a client that connects to the Nuabase API gateway. Use this for production deployments with caching, request tracking, and async job support.
-
-- `apiKey?: string` – API key for authentication. Defaults to `process.env.NUABASE_API_KEY`.
-- `baseUrl?: string` – Override the API host. Defaults to `https://api.nuabase.com`.
-
 **`Nua.direct(config)`**
-Creates a client that runs casts in this process instead of through the gateway. Use this for serverless, edge functions, or CLI tools where you don't need the gateway infrastructure. It runs on one of two kinds of engine, chosen by the config.
+Creates a client that runs casts in this process. It runs on one of two kinds of engine, chosen by the config.
 
 With API keys for LLM providers:
 
@@ -235,7 +220,7 @@ const agents = await detectLocalAgents();
 // [{ agent: 'claude-code', installed: true, loggedIn: true, version: '...', binaryPath: '...' }, ...]
 ```
 
-This runs a coding-agent CLI already installed and logged in on this machine, in its headless mode (`claude -p`, `codex exec`, or `pi --mode json`). Calls use the user's own logged-in subscription or provider login, so no API key is needed. `get()` and `list()` behave as with providers: the output is validated against your schema and typed the same way. Queue operations are not supported. `nuabase/local-agent` is a separate entry point so that browser bundles of `nuabase` never include it.
+This runs a coding-agent CLI already installed and logged in on this machine, in its headless mode (`claude -p`, `codex exec`, or `pi --mode json`). Calls use the user's own logged-in subscription or provider login, so no API key is needed. `get()` and `list()` behave as with providers: the output is validated against your schema and typed the same way. `nuabase/local-agent` is a separate entry point so that browser bundles of `nuabase` never include it.
 
 The agent is set up once, when you create it. If you install an agent or log in after that, create a new one.
 
@@ -301,16 +286,24 @@ if (result.success) {
 }
 ```
 
-**`nua.queueGet(prompt, options?)`** _(Gateway mode only)_
-Submits an async job for single-value operations. Returns `{ success: true, jobId }`.
+## Migrating from 2.x
 
-**`nua.queueList(prompt, options)`** _(Gateway mode only)_
-Submits an async job for array operations. Returns `{ success: true, jobId }`.
+Version 3 removed gateway mode. `Nua.direct()`, `get()` and `list()` are unchanged.
+
+If you used `Nua.gateway()`, `queueGet()` or `queueList()`, install [`@nuabase/gateway`](https://www.npmjs.com/package/@nuabase/gateway) and replace `Nua.gateway(config)` with `new NuaGateway(config)`:
+
+```ts
+import { NuaGateway } from '@nuabase/gateway';
+
+const nua = new NuaGateway({ apiKey: 'YOUR_API_KEY' });
+```
+
+Its `get()`, `list()`, `queueGet()` and `queueList()` take the same arguments. Their results always have `source: 'gateway'`, and `queueGet()` and `queueList()` now return the queued request's id as `jobId`, which was `undefined` before. Import `GatewayConfig`, `GatewayMeta` and `QueueResult` from `@nuabase/gateway` as well.
 
 ## Next Steps
 
-- Create an API key or inspect request logs in the [Nuabase Console](https://console.nuabase.com/).
-- Explore more SDK usage patterns (SSE streaming, webhooks, caching) in the full docs at https://docs.nuabase.com.
+- Read the full docs at https://docs.nuabase.com.
+- For row-level caching, async jobs and request logs, use the hosted Nuabase API through [`@nuabase/gateway`](https://www.npmjs.com/package/@nuabase/gateway).
 
 ## Support
 

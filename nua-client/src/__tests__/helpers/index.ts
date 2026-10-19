@@ -1,7 +1,6 @@
 export {
   createTestClient,
   expectedDirectMeta,
-  expectedSource,
   getTestModes,
   testTimeoutMs,
 } from './client-factory';

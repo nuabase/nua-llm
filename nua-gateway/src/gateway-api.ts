@@ -1,12 +1,11 @@
-import { AuthTokenManager } from '../lib/auth';
-import { resolveConfigValue } from '../lib/env';
-import { parseErrorResponse } from '../lib/error-response';
-import { getErrorMessageFromException } from '../lib/error-utils';
+import { AuthTokenManager } from './lib/auth';
+import { resolveConfigValue } from './lib/env';
+import { parseErrorResponse } from './lib/error-response';
+import { getErrorMessageFromException } from './lib/error-utils';
 import {
   CastArrayParams,
   CastResult,
   CastValueParams,
-  LlmBackend,
   NormalizedUsage,
   QueueResult,
 } from './types';
@@ -44,6 +43,11 @@ type ApiCastArrayResponse = {
   model: string;
 };
 
+// A queued request's id: the llm_request that the job will fill in.
+type ApiQueuedResponse = {
+  id: string;
+};
+
 type ApiErrorResponse = {
   error: string;
 };
@@ -52,7 +56,8 @@ function isErrorResponse(response: unknown): response is ApiErrorResponse {
   return Boolean(response && typeof response === 'object' && 'error' in response);
 }
 
-export class GatewayBackend implements LlmBackend {
+/** The Nuabase API's HTTP endpoints. */
+export class GatewayApi {
   private readonly baseUrl: string;
   private readonly authManager: AuthTokenManager;
 
@@ -137,8 +142,8 @@ export class GatewayBackend implements LlmBackend {
       return { success: false, error: response.error, source: 'gateway' };
     }
 
-    const apiResponse = response as { jobId: string };
-    return { success: true, jobId: apiResponse.jobId, source: 'gateway' };
+    const apiResponse = response as ApiQueuedResponse;
+    return { success: true, jobId: apiResponse.id, source: 'gateway' };
   }
 
   async queueCastArray(params: CastArrayParams): Promise<QueueResult> {
@@ -152,8 +157,8 @@ export class GatewayBackend implements LlmBackend {
       return { success: false, error: response.error, source: 'gateway' };
     }
 
-    const apiResponse = response as { jobId: string };
-    return { success: true, jobId: apiResponse.jobId, source: 'gateway' };
+    const apiResponse = response as ApiQueuedResponse;
+    return { success: true, jobId: apiResponse.id, source: 'gateway' };
   }
 
   private async post(path: string, body: object): Promise<unknown> {

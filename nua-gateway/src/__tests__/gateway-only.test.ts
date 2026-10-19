@@ -1,47 +1,22 @@
 /**
- * Gateway-only tests for stateful features that require api-server.
- *
- * These tests verify features that are not available in direct mode:
+ * Tests for what the Nuabase API keeps about each request, checked by calling it directly:
  * - Request ID tracking (llmRequestId)
  * - Request retrieval (GET /requests/:id)
  * - Cache usage tracking (llmUsage vs cacheUsage)
  *
- * Prerequisites:
- * - api-server running on localhost:3030
- * - Valid NUABASE_API_KEY environment variable
+ * Calls the API at NUABASE_API_URL (the hosted API by default) with NUABASE_API_KEY.
  */
 
-import { Nua } from '../nua';
+import { NuaGateway } from '../nua-gateway';
+import { apiBaseUrl, authHeaders } from './helpers/gateway-env';
 import { z } from 'zod';
 
-const baseUrl = process.env.NUABASE_API_URL;
-if (!baseUrl) throw new Error('NUABASE_API_URL must be set');
-
-// Skip all tests if SKIP_GATEWAY_TESTS is set
-const shouldSkip = process.env.SKIP_GATEWAY_TESTS === '1';
-
-async function getAuthHeaders(): Promise<Record<string, string>> {
-  const apiKey = process.env.NUABASE_API_KEY;
-  if (!apiKey) {
-    throw new Error('NUABASE_API_KEY is required for gateway-only tests');
-  }
-  return {
-    Authorization: `Bearer ${apiKey}`,
-    'Content-Type': 'application/json',
-  };
-}
-
 describe('gateway-only features', () => {
-  if (shouldSkip) {
-    test.skip('skipped - SKIP_GATEWAY_TESTS is set', () => {});
-    return;
-  }
-
   describe('request tracking', () => {
     test('castValue returns llmRequestId', async () => {
-      const headers = await getAuthHeaders();
+      const headers = authHeaders();
 
-      const response = await fetch(`${baseUrl}/cast/value/now`, {
+      const response = await fetch(`${apiBaseUrl()}/cast/value/now`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -59,10 +34,10 @@ describe('gateway-only features', () => {
     }, 30000);
 
     test('getRequest returns stored request', async () => {
-      const headers = await getAuthHeaders();
+      const headers = authHeaders();
 
       // First, make a request
-      const castResponse = await fetch(`${baseUrl}/cast/value/now`, {
+      const castResponse = await fetch(`${apiBaseUrl()}/cast/value/now`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -78,7 +53,7 @@ describe('gateway-only features', () => {
       expect(requestId).toBeDefined();
 
       // Then, retrieve it
-      const getResponse = await fetch(`${baseUrl}/requests/${requestId}`, {
+      const getResponse = await fetch(`${apiBaseUrl()}/requests/${requestId}`, {
         headers,
       });
 
@@ -92,8 +67,8 @@ describe('gateway-only features', () => {
 
   describe('model override', () => {
     test('response and stored request both have specified model', async () => {
-      const nua = Nua.gateway({});
-      const headers = await getAuthHeaders();
+      const nua = new NuaGateway();
+      const headers = authHeaders();
       const specifiedModel = {
         provider: 'openrouter' as const,
         model: 'anthropic/claude-sonnet-5.5',
@@ -108,8 +83,6 @@ describe('gateway-only features', () => {
       });
 
       if (!response.success) throw new Error(`error in api response: ${response.error}`);
-      if (response.source !== 'gateway') throw new Error('expected gateway source');
-
       // Check response model matches
       expect(response.model).toBe(specifiedModel.model);
 
@@ -117,7 +90,7 @@ describe('gateway-only features', () => {
       const requestId = response.meta.requestId;
       expect(requestId).toBeDefined();
 
-      const getResponse = await fetch(`${baseUrl}/requests/${requestId}`, {
+      const getResponse = await fetch(`${apiBaseUrl()}/requests/${requestId}`, {
         headers,
       });
 
@@ -131,12 +104,12 @@ describe('gateway-only features', () => {
 
   describe('cache behavior', () => {
     test('response includes both llmUsage and cacheUsage', async () => {
-      const headers = await getAuthHeaders();
+      const headers = authHeaders();
 
       // Use a unique prompt to avoid cache hits from other tests
       const uniquePrompt = `Return the number ${Date.now()}`;
 
-      const response = await fetch(`${baseUrl}/cast/value/now`, {
+      const response = await fetch(`${apiBaseUrl()}/cast/value/now`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -166,7 +139,7 @@ describe('gateway-only features', () => {
   });
 
   test('model override returns specified model in response', async () => {
-    const nua = Nua.gateway({});
+    const nua = new NuaGateway();
     const NumberSchema = z.number();
     const specifiedModel = {
       provider: 'openrouter' as const,

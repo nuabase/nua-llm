@@ -1,6 +1,5 @@
 import { DirectBackend, DirectConfig } from './backend/direct';
-import { GatewayBackend, GatewayConfig } from './backend/gateway';
-import { CastResult, LlmBackend, QueueResult } from './backend/types';
+import { CastResult, LlmBackend } from './backend/types';
 import type { ModelInput } from 'nua-llm-core';
 import { z } from 'zod';
 
@@ -42,10 +41,6 @@ export class Nua {
 
   private constructor(backend: LlmBackend) {
     this.backend = backend;
-  }
-
-  static gateway(config: GatewayConfig): Nua {
-    return new Nua(new GatewayBackend(config));
   }
 
   /**
@@ -112,75 +107,6 @@ export class Nua {
     const jsonSchema = z.toJSONSchema(options.output.schema);
 
     return this.backend.castArray({
-      prompt,
-      data: options.input,
-      primaryKey: options.primaryKey,
-      outputName: options.output.name,
-      outputSchema: jsonSchema,
-      model: options.model,
-    });
-  }
-
-  // ========== queueGet() - Async Single Value ==========
-
-  // Overload 1: Prompt only
-  queueGet(prompt: string): Promise<QueueResult>;
-
-  // Overload 2: With options
-  queueGet<TSchema extends z.ZodTypeAny>(
-    prompt: string,
-    options: GetOptions<TSchema>
-  ): Promise<QueueResult>;
-
-  // Implementation
-  async queueGet(prompt: string, options?: GetOptions<z.ZodTypeAny>): Promise<QueueResult> {
-    if (typeof prompt !== 'string' || prompt.trim() === '') {
-      throw new TypeError('Prompt must be a non-empty string');
-    }
-
-    if (!this.backend.queueCastValue) {
-      throw new Error('Queue operations are only supported in gateway mode');
-    }
-
-    const outputSchema = options?.output?.schema ?? z.string();
-    const outputName = options?.output?.name ?? 'result';
-    const jsonSchema = z.toJSONSchema(outputSchema);
-
-    return this.backend.queueCastValue({
-      prompt,
-      data: options?.input ?? null,
-      outputName,
-      outputSchema: jsonSchema,
-      model: options?.model,
-    });
-  }
-
-  // ========== queueList() - Async Array Operations ==========
-
-  async queueList<
-    TSchema extends z.ZodTypeAny,
-    TData extends Record<string, unknown>,
-    PrimaryKey extends keyof TData & string,
-  >(prompt: string, options: ListOptions<TSchema, TData, PrimaryKey>): Promise<QueueResult> {
-    if (typeof prompt !== 'string' || prompt.trim() === '') {
-      throw new TypeError('Prompt must be a non-empty string');
-    }
-
-    if (!this.backend.queueCastArray) {
-      throw new Error('Queue operations are only supported in gateway mode');
-    }
-
-    if (!Array.isArray(options.input)) {
-      throw new TypeError('Input must be an array for queueList()');
-    }
-
-    if (typeof options.primaryKey !== 'string' || options.primaryKey.trim() === '') {
-      throw new TypeError('primaryKey must be a non-empty string');
-    }
-
-    const jsonSchema = z.toJSONSchema(options.output.schema);
-
-    return this.backend.queueCastArray({
       prompt,
       data: options.input,
       primaryKey: options.primaryKey,

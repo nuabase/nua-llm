@@ -4,7 +4,7 @@
   "scripts": {
     "release:status": "node scripts/release-status.mjs",
     "release:version": "changeset version && pnpm install",
-    "release:publish": "mise exec -- pnpm --filter nuabase run release"
+    "release:publish": "mise exec -- node scripts/release-packages.mjs"
   },
   "devDependencies": {
     "@changesets/cli": "^3.0.3"

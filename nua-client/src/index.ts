@@ -9,12 +9,9 @@ export type {
   CastValueParams,
   CastArrayParams,
   NormalizedUsage,
-  GatewayMeta,
   DirectMeta,
   CastResultSource,
-  QueueResult,
 } from './backend/types';
-export type { GatewayConfig } from './backend/gateway';
 export type { DirectConfig, ProviderApiKeys } from './backend/direct';
 export type { AnswerOrigin, LocalAgentId, ModelInput, SchemaEnforcementKind } from 'nua-llm-core';
 

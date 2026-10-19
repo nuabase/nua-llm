@@ -36,6 +36,7 @@ COPY --chown=${APP_USER_NAME}:${APP_USER_NAME} api-server/package.json ./api-ser
 COPY --chown=${APP_USER_NAME}:${APP_USER_NAME} nua-llm-core/package.json ./nua-llm-core/
 COPY --chown=${APP_USER_NAME}:${APP_USER_NAME} nua-llm-caching/package.json ./nua-llm-caching/
 COPY --chown=${APP_USER_NAME}:${APP_USER_NAME} nua-client/package.json ./nua-client/
+COPY --chown=${APP_USER_NAME}:${APP_USER_NAME} nua-gateway/package.json ./nua-gateway/
 
 # Install dependencies for all packages
 # BuildKit cache mount persists the pnpm store across builds for faster installs.
