@@ -10,9 +10,29 @@ Example use-cases:
 - Enrich a list of food items with nutrition facts
 - Tag sales leads with more details about the company
 
-This package runs every call in your own process: on LLM providers' APIs with your own API keys, or on a coding agent already installed on your machine (Claude Code, Codex or Pi). It never sends anything to Nuabase; see [Where your data goes](#where-your-data-goes). All outputs are validated against the schema you specified.
+This package runs every call in your own process: on LLM providers' APIs with your own API keys, or on a coding agent already installed on your machine (Claude Code, Codex or Pi). All outputs are validated against the schema you specified.
 
-The hosted Nuabase API, with row-level caching, async jobs delivered by webhook or SSE, and request logs in the [Nuabase Console](https://console.nuabase.com), has its own client: [`@nuabase/gateway`](https://www.npmjs.com/package/@nuabase/gateway).
+## Data flow
+
+Each call sends your prompt, your input data, and your Zod schema converted to JSON Schema. The response is validated against that schema before you see it.
+
+| You call                                  | Set up with                  | Where the prompt, data and schema go                                                                                         | Requests per call                   |
+| ----------------------------------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| `nua.get()`, `nua.list()`                 | `Nua.direct({ providers })`  | One LLM provider's endpoint (below), called from your process with your API key                                              | 1, retried up to 2 times on failure |
+| `nua.get()`, `nua.list()`                 | `Nua.direct({ localAgent })` | The agent's CLI on this machine (`claude -p`, `codex exec` or `pi --mode json`), which calls its own vendor under your login | 1 agent run, retried up to 2 times  |
+| `findLocalAgent()`, `detectLocalAgents()` | `nuabase/local-agent`        | No prompt or data: they run each CLI's version and login-status commands, which make no model calls                          | –                                   |
+
+`list()` sends all its rows in a single request.
+
+| Provider   | Endpoint                                                                          |
+| ---------- | --------------------------------------------------------------------------------- |
+| Groq       | `https://api.groq.com/openai/v1/chat/completions`                                 |
+| Cerebras   | `https://api.cerebras.ai/v1/chat/completions`                                     |
+| Gemini     | `https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent` |
+| OpenRouter | `https://openrouter.ai/api/v1/chat/completions`                                   |
+| DeepSeek   | `https://api.deepseek.com/chat/completions`                                       |
+
+The provider is the one in the call's `model`, or in the client's default `model`. An alias such as `{ alias: 'fast' }` uses the first of its providers that you gave a key for.
 
 ## Usage at a glance
 
@@ -129,17 +149,6 @@ console.log(response.data);
 // ];
 ```
 
-## Where your data goes
-
-Your prompt, input data and output schema go only to the engine you configure:
-
-- With `providers`, to the APIs of the LLM providers you gave keys for, called directly from your process.
-- With `localAgent`, to the coding-agent CLI on your machine, which sends them on to its own vendor under your login.
-
-Nothing goes to Nuabase. This package contains no code that calls the Nuabase API, and its build fails if any appears. To use the hosted Nuabase API, install [`@nuabase/gateway`](https://www.npmjs.com/package/@nuabase/gateway).
-
-Zod schemas compile to JSON Schema, and the SDK validates every response against it before you see it.
-
 ## API Response
 
 Every call returns a discriminated union. When `success` is `false`, you get an error object. Otherwise `success` is `true`, and `data` contains your typed output along with metadata.
@@ -160,22 +169,22 @@ Every call returns a discriminated union. When `success` is `false`, you get an 
 
 **Metadata** (`meta`):
 
-| Field               | Type                         | Description                                                                                               |
-| ------------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `engine`            | `'http'` \| `'local-agent'`  | Whether an LLM provider's API or a coding agent on this machine answered.                                 |
-| `schemaEnforcement` | `'in-prompt'` \| `'native'`  | Whether the schema was described in the prompt or enforced by the engine. Output is validated either way. |
-| `provider`          | `string`                     | `engine: 'http'` only. The LLM provider.                                                                  |
+| Field               | Type                                   | Description                                                                                               |
+| ------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `engine`            | `'http'` \| `'local-agent'`            | Whether an LLM provider's API or a coding agent on this machine answered.                                 |
+| `schemaEnforcement` | `'in-prompt'` \| `'native'`            | Whether the schema was described in the prompt or enforced by the engine. Output is validated either way. |
+| `provider`          | `string`                               | `engine: 'http'` only. The LLM provider.                                                                  |
 | `agent`             | `'claude-code'` \| `'codex'` \| `'pi'` | `engine: 'local-agent'` only. Which coding agent answered.                                                |
-| `costUsdEstimate`   | `number \| undefined`        | `engine: 'local-agent'` only. The agent's own estimate. On a subscription this is not what you pay.       |
+| `costUsdEstimate`   | `number \| undefined`                  | `engine: 'local-agent'` only. The agent's own estimate. On a subscription this is not what you pay.       |
 
 **Error**
 
-| Field       | Type                      | Description                         |
-| ----------- | ------------------------- | ----------------------------------- |
-| `success`   | `false`                   | Indicates the request failed.       |
-| `error`     | `string`                  | Message describing the error.       |
-| `source`    | `'direct'`                | The request ran in this process.    |
-| `latencyMs` | `number`                  | Time until failure in milliseconds. |
+| Field       | Type       | Description                         |
+| ----------- | ---------- | ----------------------------------- |
+| `success`   | `false`    | Indicates the request failed.       |
+| `error`     | `string`   | Message describing the error.       |
+| `source`    | `'direct'` | The request ran in this process.    |
+| `latencyMs` | `number`   | Time until failure in milliseconds. |
 
 ## SDK API
 
@@ -286,24 +295,9 @@ if (result.success) {
 }
 ```
 
-## Migrating from 2.x
-
-Version 3 removed gateway mode. `Nua.direct()`, `get()` and `list()` are unchanged.
-
-If you used `Nua.gateway()`, `queueGet()` or `queueList()`, install [`@nuabase/gateway`](https://www.npmjs.com/package/@nuabase/gateway) and replace `Nua.gateway(config)` with `new NuaGateway(config)`:
-
-```ts
-import { NuaGateway } from '@nuabase/gateway';
-
-const nua = new NuaGateway({ apiKey: 'YOUR_API_KEY' });
-```
-
-Its `get()`, `list()`, `queueGet()` and `queueList()` take the same arguments. Their results always have `source: 'gateway'`, and `queueGet()` and `queueList()` now return the queued request's id as `jobId`, which was `undefined` before. Import `GatewayConfig`, `GatewayMeta` and `QueueResult` from `@nuabase/gateway` as well.
-
 ## Next Steps
 
 - Read the full docs at https://docs.nuabase.com.
-- For row-level caching, async jobs and request logs, use the hosted Nuabase API through [`@nuabase/gateway`](https://www.npmjs.com/package/@nuabase/gateway).
 
 ## Support
 
