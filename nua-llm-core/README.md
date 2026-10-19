@@ -123,7 +123,7 @@ const auto = new NuaLlmClient(await findLocalAgent());
 
 `localAgent()` looks up the CLI on `PATH` when it is called and throws if it is missing; a missing login shows up as the first call's error. `findLocalAgent()` runs each CLI's version and login-status commands, and rejects when none is ready. Both set the agent up once; if you install or log in to an agent later, create a new one. Their options are `model` (the agent's own model name for calls that name none), `timeoutMs`, `concurrency`, `auth`, and `logger`; `localAgent()` also takes `binaryPath`.
 
-`nua-llm-core/local-agent` is a separate entry point because it imports Node built-ins; the main entry point stays loadable in browsers. Local agents take model aliases they have an equivalent for (`haiku`, `sonnet`, `opus` for Claude Code), not provider models. Codex and Pi have no aliases: pass one of their own model names (`provider/id` for Pi) through `localAgent({ model })`.
+`nua-llm-core/local-agent` is a separate entry point because it imports Node built-ins; the main entry point stays loadable in edge runtimes (such as Cloudflare Workers or Vercel Edge). Local agents take model aliases they have an equivalent for (`haiku`, `sonnet`, `opus` for Claude Code), not provider models. Codex and Pi have no aliases: pass one of their own model names (`provider/id` for Pi) through `localAgent({ model })`.
 
 The router's logger receives each call's log lines, and the client logs its retries there too, so there is one logger to configure.
 

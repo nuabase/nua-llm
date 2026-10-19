@@ -178,7 +178,7 @@ await nua.get('Extract company name', {
 
 Run prompts through a coding agent CLI already installed and logged in on your machine (`claude -p`, `codex exec`, or `pi --mode json`). This uses your existing CLI login or subscription—no API key required.
 
-Import helpers from `nuabase/local-agent` (kept at a separate entry point so browser bundles stay clean):
+Import helpers from `nuabase/local-agent` (kept at a separate entry point so the main `nuabase` entry point stays free of Node built-ins, which edge runtimes such as Cloudflare Workers or Vercel Edge lack):
 
 ```ts
 import { Nua } from 'nuabase';

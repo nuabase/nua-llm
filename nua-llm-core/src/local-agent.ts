@@ -1,5 +1,6 @@
 // Node.js-only entry point: runs coding-agent CLIs installed on this machine.
-// Kept separate from the main entry point so that one stays loadable in browsers.
+// Kept separate from the main entry point so that one stays loadable in edge runtimes
+// (such as Cloudflare Workers or Vercel Edge).
 
 export { findLocalAgent, localAgent } from "./modules/engine/local-agent/create-local-agent";
 export type {

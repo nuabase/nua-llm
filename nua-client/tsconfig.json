@@ -2,10 +2,9 @@
   "include": ["src", "scripts"],
   "compilerOptions": {
     "target": "ES2015",
-    "lib": ["DOM", "ESNext"],
+    "lib": ["ESNext"],
     "module": "ESNext",
     "moduleResolution": "Node",
-    "jsx": "react",
     "skipLibCheck": true,
     "outDir": "temp",
     "declaration": true,

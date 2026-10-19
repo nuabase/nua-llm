@@ -7,9 +7,9 @@ import esbuild from 'rollup-plugin-esbuild';
 import nodeExternals from 'rollup-plugin-node-externals';
 
 export default {
-  // Two entry points: "nuabase", which must load in browsers, and the Node-only
-  // "nuabase/local-agent", which runs coding-agent CLIs. Code both use goes into
-  // shared chunks.
+  // Two entry points: "nuabase", which must load in edge runtimes (such as
+  // Cloudflare Workers or Vercel Edge), and the Node-only "nuabase/local-agent",
+  // which runs coding-agent CLIs. Code both use goes into shared chunks.
   input: {
     index: path.join(process.cwd(), './src/index.ts'),
     'local-agent': path.join(process.cwd(), './src/local-agent.ts'),

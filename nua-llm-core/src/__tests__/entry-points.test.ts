@@ -1,8 +1,9 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-// The main entry point is bundled into browser code, so nothing it reaches may
-// import Node built-ins. Only the "local-agent" entry point may.
+// The main entry point must load in edge runtimes (such as Cloudflare Workers or
+// Vercel Edge), so nothing it reaches may import Node built-ins. Only the
+// "local-agent" entry point may.
 
 const SRC = path.join(__dirname, "..");
 

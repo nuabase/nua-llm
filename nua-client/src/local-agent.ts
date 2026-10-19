@@ -1,5 +1,6 @@
 // Node.js-only entry point ("nuabase/local-agent"): runs coding-agent CLIs installed on
-// this machine. Kept apart from the main entry point so that one stays loadable in browsers.
+// this machine. Kept apart from the main entry point so that one stays loadable in edge
+// runtimes (such as Cloudflare Workers or Vercel Edge).
 
 export {
   detectLocalAgents,
