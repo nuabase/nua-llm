@@ -30,23 +30,6 @@ type ModelAliasName =
 /** A provider's model, or one of the API's model aliases. */
 export type ModelInput = { provider: LlmProviderId; model: string } | { alias: ModelAliasName };
 
-export type CastValueParams = {
-  prompt: string;
-  data: unknown;
-  outputName: string;
-  outputSchema: object;
-  model?: ModelInput;
-};
-
-export type CastArrayParams = {
-  prompt: string;
-  data: unknown[];
-  primaryKey: string;
-  outputName: string;
-  outputSchema: object;
-  model?: ModelInput;
-};
-
 export type GatewayMeta = {
   requestId: string;
   cached: boolean;

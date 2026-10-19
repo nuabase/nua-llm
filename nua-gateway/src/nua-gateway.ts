@@ -1,8 +1,26 @@
-import { GatewayApi, GatewayConfig } from './gateway-api';
-import { CastArrayParams, CastResult, CastValueParams, ModelInput, QueueResult } from './types';
+import { AuthTokenManager } from './lib/auth';
+import { resolveConfigValue } from './lib/env';
+import { parseErrorResponse } from './lib/error-response';
+import { getErrorMessageFromException } from './lib/error-utils';
+import { CastResult, ModelInput, NormalizedUsage, QueueResult } from './types';
 import { z } from 'zod';
 
 // ========== Public Types ==========
+
+type GatewayApiKeyConfig = {
+  apiKey?: string;
+  fetchToken?: never;
+  baseUrl?: string;
+  dangerouslyAllowBrowserApiKeyInLocalhost?: boolean;
+};
+
+type GatewayTokenConfig = {
+  fetchToken: () => Promise<string>;
+  apiKey?: never;
+  baseUrl?: string;
+};
+
+export type GatewayConfig = GatewayApiKeyConfig | GatewayTokenConfig;
 
 export type OutputDef<TSchema extends z.ZodTypeAny> = {
   name: string;
@@ -33,6 +51,39 @@ export type ListResultRow<TSchema extends z.ZodTypeAny, PrimaryKey extends strin
   [outputName: string]: z.infer<TSchema>;
 };
 
+// ========== Nuabase API responses ==========
+
+type ApiCastValueResponse = {
+  llmRequestId: string;
+  data: unknown;
+  isCacheHit: boolean;
+  llmUsage: NormalizedUsage;
+  cacheUsage: NormalizedUsage;
+  model: string;
+};
+
+type ApiCastArrayResponse = {
+  llmRequestId: string;
+  data: unknown[];
+  cacheHits: number;
+  llmUsage: NormalizedUsage;
+  cacheUsage: NormalizedUsage;
+  model: string;
+};
+
+// A queued request's id: the llm_request that the job will fill in.
+type ApiQueuedResponse = {
+  id: string;
+};
+
+type ApiErrorResponse = {
+  error: string;
+};
+
+function isErrorResponse(response: unknown): response is ApiErrorResponse {
+  return Boolean(response && typeof response === 'object' && 'error' in response);
+}
+
 // ========== NuaGateway Class ==========
 
 /**
@@ -43,10 +94,13 @@ export type ListResultRow<TSchema extends z.ZodTypeAny, PrimaryKey extends strin
  * (Node.js only).
  */
 export class NuaGateway {
-  private readonly api: GatewayApi;
+  private readonly baseUrl: string;
+  private readonly authManager: AuthTokenManager;
 
   constructor(config: GatewayConfig = {}) {
-    this.api = new GatewayApi(config);
+    this.baseUrl =
+      resolveConfigValue(config, 'baseUrl', 'NUABASE_API_URL') || 'https://api.nuabase.com';
+    this.authManager = new AuthTokenManager(config);
   }
 
   // ========== get() - Single Value Operations ==========
@@ -62,7 +116,31 @@ export class NuaGateway {
 
   // Implementation
   async get(prompt: string, options?: GetOptions<z.ZodTypeAny>): Promise<CastResult<unknown>> {
-    return this.api.castValue(valueRequest(prompt, options));
+    const body = valueBody(prompt, options);
+
+    const startTime = Date.now();
+    const response = await this.post('cast/value/now', body);
+    const latencyMs = Date.now() - startTime;
+
+    if (isErrorResponse(response)) {
+      return { success: false, error: response.error, source: 'gateway', latencyMs };
+    }
+
+    const apiResponse = response as ApiCastValueResponse;
+    return {
+      success: true,
+      data: apiResponse.data,
+      usage: combinedUsage(apiResponse.llmUsage, apiResponse.cacheUsage),
+      model: apiResponse.model,
+      latencyMs,
+      source: 'gateway',
+      meta: {
+        requestId: apiResponse.llmRequestId,
+        cached: apiResponse.isCacheHit,
+        llmUsage: apiResponse.llmUsage,
+        cacheUsage: apiResponse.cacheUsage,
+      },
+    };
   }
 
   // ========== list() - Array Operations ==========
@@ -75,7 +153,31 @@ export class NuaGateway {
     prompt: string,
     options: ListOptions<TSchema, TData, PrimaryKey>
   ): Promise<CastResult<ListResultRow<TSchema, PrimaryKey>[]>> {
-    return this.api.castArray(arrayRequest(prompt, options, 'list()'));
+    const body = arrayBody(prompt, options, 'list()');
+
+    const startTime = Date.now();
+    const response = await this.post('cast/array/now', body);
+    const latencyMs = Date.now() - startTime;
+
+    if (isErrorResponse(response)) {
+      return { success: false, error: response.error, source: 'gateway', latencyMs };
+    }
+
+    const apiResponse = response as ApiCastArrayResponse;
+    return {
+      success: true,
+      data: apiResponse.data as ListResultRow<TSchema, PrimaryKey>[],
+      usage: combinedUsage(apiResponse.llmUsage, apiResponse.cacheUsage),
+      model: apiResponse.model,
+      latencyMs,
+      source: 'gateway',
+      meta: {
+        requestId: apiResponse.llmRequestId,
+        cached: apiResponse.cacheHits === apiResponse.data.length,
+        llmUsage: apiResponse.llmUsage,
+        cacheUsage: apiResponse.cacheUsage,
+      },
+    };
   }
 
   // ========== queueGet() - Async Single Value ==========
@@ -91,7 +193,14 @@ export class NuaGateway {
 
   // Implementation
   async queueGet(prompt: string, options?: GetOptions<z.ZodTypeAny>): Promise<QueueResult> {
-    return this.api.queueCastValue(valueRequest(prompt, options));
+    const response = await this.post('cast/value', valueBody(prompt, options));
+
+    if (isErrorResponse(response)) {
+      return { success: false, error: response.error, source: 'gateway' };
+    }
+
+    const apiResponse = response as ApiQueuedResponse;
+    return { success: true, jobId: apiResponse.id, source: 'gateway' };
   }
 
   // ========== queueList() - Async Array Operations ==========
@@ -101,29 +210,70 @@ export class NuaGateway {
     TData extends Record<string, unknown>,
     PrimaryKey extends keyof TData & string,
   >(prompt: string, options: ListOptions<TSchema, TData, PrimaryKey>): Promise<QueueResult> {
-    return this.api.queueCastArray(arrayRequest(prompt, options, 'queueList()'));
+    const response = await this.post('cast/array', arrayBody(prompt, options, 'queueList()'));
+
+    if (isErrorResponse(response)) {
+      return { success: false, error: response.error, source: 'gateway' };
+    }
+
+    const apiResponse = response as ApiQueuedResponse;
+    return { success: true, jobId: apiResponse.id, source: 'gateway' };
+  }
+
+  private async post(path: string, body: object): Promise<unknown> {
+    const url = `${this.baseUrl}/${path}`;
+
+    let response: Response;
+
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${await this.authManager.getToken()}`,
+      'Content-Type': 'application/json',
+    };
+
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
+    } catch (e) {
+      return { error: `Error calling Nuabase API: ${getErrorMessageFromException(e)}` };
+    }
+
+    if (!response.ok) {
+      return await parseErrorResponse(response, path);
+    }
+
+    try {
+      return await response.json();
+    } catch {
+      return { error: 'Invalid response received from Nuabase API call, unable to parse' };
+    }
   }
 }
 
-// ========== Request building ==========
+// ========== Request bodies ==========
 
-function valueRequest(prompt: string, options?: GetOptions<z.ZodTypeAny>): CastValueParams {
+// The body of POST /cast/value and /cast/value/now.
+function valueBody(prompt: string, options?: GetOptions<z.ZodTypeAny>) {
   checkPrompt(prompt);
 
   return {
-    prompt,
-    data: options?.input ?? null,
-    outputName: options?.output?.name ?? 'result',
-    outputSchema: z.toJSONSchema(options?.output?.schema ?? z.string()),
-    model: options?.model,
+    input: { prompt, data: options?.input ?? null },
+    output: {
+      name: options?.output?.name ?? 'result',
+      schema: z.toJSONSchema(options?.output?.schema ?? z.string()),
+    },
+    ...(options?.model && { model: options.model }),
   };
 }
 
-function arrayRequest(
+// The body of POST /cast/array and /cast/array/now.
+function arrayBody(
   prompt: string,
   options: ListOptions<z.ZodTypeAny, Record<string, unknown>, string>,
   method: string
-): CastArrayParams {
+) {
   checkPrompt(prompt);
 
   if (!Array.isArray(options.input)) {
@@ -135,12 +285,9 @@ function arrayRequest(
   }
 
   return {
-    prompt,
-    data: options.input,
-    primaryKey: options.primaryKey,
-    outputName: options.output.name,
-    outputSchema: z.toJSONSchema(options.output.schema),
-    model: options.model,
+    input: { prompt, data: options.input, primaryKey: options.primaryKey },
+    output: { name: options.output.name, schema: z.toJSONSchema(options.output.schema) },
+    ...(options.model && { model: options.model }),
   };
 }
 
@@ -148,4 +295,22 @@ function checkPrompt(prompt: string): void {
   if (typeof prompt !== 'string' || prompt.trim() === '') {
     throw new TypeError('Prompt must be a non-empty string');
   }
+}
+
+/**
+ * Tokens the LLM used for this request plus the tokens of results served from the gateway's cache.
+ * The provider's prompt-cache counts come from the LLM call alone.
+ */
+function combinedUsage(llmUsage: NormalizedUsage, cacheUsage: NormalizedUsage): NormalizedUsage {
+  return {
+    promptTokens: llmUsage.promptTokens + cacheUsage.promptTokens,
+    completionTokens: llmUsage.completionTokens + cacheUsage.completionTokens,
+    totalTokens: llmUsage.totalTokens + cacheUsage.totalTokens,
+    ...(llmUsage.promptCacheReadTokens !== undefined && {
+      promptCacheReadTokens: llmUsage.promptCacheReadTokens,
+    }),
+    ...(llmUsage.promptCacheWriteTokens !== undefined && {
+      promptCacheWriteTokens: llmUsage.promptCacheWriteTokens,
+    }),
+  };
 }
