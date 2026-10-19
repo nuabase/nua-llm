@@ -1,94 +1,38 @@
-## Nuabase TypeScript SDK
+# Nuabase TypeScript SDK
 
-Nuabase turns LLM prompts into type-safe functions in under five lines of code.
+Nuabase turns LLM prompts and Zod schemas into type-safe functions. Pass a prompt, input data, and a Zod schema; receive validated, typed data back.
 
-With Nuabase, you write a prompt, specify the output schema, and get back a well-typed function. You can invoke it with input data, like any other code in your application, and receive data that matches the exact schema you specified.
+Every call runs directly in your process—either against the LLM provider API you choose, using your API keys, or via a local coding agent CLI already installed on your machine (`claude`, `codex`, or `pi`).
 
-Example use-cases:
+**Common use cases:**
+- Extract structured fields from free-form text to auto-fill complex forms
+- Enrich arrays of items (e.g., adding nutrition facts to a list of foods)
+- Classify and tag sales leads with company metadata
 
-- Provide free-form text input for faster filling of complex HTML forms
-- Enrich a list of food items with nutrition facts
-- Tag sales leads with more details about the company
-
-This package runs every call in your own process: on LLM providers' APIs with your own API keys, or on a coding agent already installed on your machine (Claude Code, Codex or Pi). All outputs are validated against the schema you specified.
-
-## Data flow
-
-Each call sends your prompt, your input data, and your Zod schema converted to JSON Schema. The response is validated against that schema before you see it.
-
-| You call                                  | Set up with                  | Where the prompt, data and schema go                                                                                         | Requests per call                   |
-| ----------------------------------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
-| `nua.get()`, `nua.list()`                 | `Nua.direct({ providers })`  | One LLM provider's endpoint (below), called from your process with your API key                                              | 1, retried up to 2 times on failure |
-| `nua.get()`, `nua.list()`                 | `Nua.direct({ localAgent })` | The agent's CLI on this machine (`claude -p`, `codex exec` or `pi --mode json`), which calls its own vendor under your login | 1 agent run, retried up to 2 times  |
-| `findLocalAgent()`, `detectLocalAgents()` | `nuabase/local-agent`        | No prompt or data: they run each CLI's version and login-status commands, which make no model calls                          | –                                   |
-
-`list()` sends all its rows in a single request.
-
-| Provider   | Endpoint                                                                          |
-| ---------- | --------------------------------------------------------------------------------- |
-| Groq       | `https://api.groq.com/openai/v1/chat/completions`                                 |
-| Cerebras   | `https://api.cerebras.ai/v1/chat/completions`                                     |
-| Gemini     | `https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent` |
-| OpenRouter | `https://openrouter.ai/api/v1/chat/completions`                                   |
-| DeepSeek   | `https://api.deepseek.com/chat/completions`                                       |
-
-The provider is the one in the call's `model`, or in the client's default `model`. An alias such as `{ alias: 'fast' }` uses the first of its providers that you gave a key for.
-
-## Usage at a glance
-
-**1. Input.** Start with the data you want to send to the LLM:
-
-```ts
-const leads = [{ id: 'lead-101', notes: 'Growth-stage SaaS, ~80 employees, wants a demo.' }];
-```
-
-**2. Desired shape.** Describe the structure you expect back:
-
-```ts
-const LeadInsights = z.object({
-  industry: z.string(),
-  company_size: z.enum(['SMB', 'Mid-market', 'Enterprise']),
-});
-```
-
-**3. Call the API.** Use `list()` for array operations:
-
-```ts
-const nua = Nua.direct({ providers: { openrouter: { apiKey: 'YOUR_OPENROUTER_KEY' } } });
-
-const result = await nua.list('Classify each lead with industry and company_size bucket.', {
-  input: leads,
-  primaryKey: 'id',
-  output: { name: 'leadInsights', schema: LeadInsights },
-});
-```
-
-**4. Use the result.** Check for success and access typed data:
-
-```ts
-if (!result.success) throw new Error(result.error);
-console.log(result.data[0].leadInsights);
-// -> { industry: 'Software', company_size: 'Mid-market' }
-```
+---
 
 ## Quick Start
 
-1. Add the Nuabase SDK along with Zod:
+### 1. Install
 
 ```bash
 npm install nuabase zod
 ```
 
-2. Get an API key from one of the supported LLM providers (Groq, Cerebras, Gemini, OpenRouter or DeepSeek) and pass it to `Nua.direct({ providers })`. Or, in Node.js, use a coding agent that is installed and logged in on your machine, with no API key: see [Constructors](#constructors).
+### 2. Initialize and Call
 
-## Lead Enrichment Example
+Configure `Nua.direct()` with an LLM provider API key (or a [local agent](#2-local-coding-agent-nodejs-only)), define your expected Zod schema, and call `get()` or `list()`:
 
 ```ts
 import { Nua } from 'nuabase';
 import { z } from 'zod';
 
-const nua = Nua.direct({ providers: { openrouter: { apiKey: process.env.OPENROUTER_API_KEY! } } });
+// 1. Initialize client
+const nua = Nua.direct({
+  providers: { openrouter: { apiKey: process.env.OPENROUTER_API_KEY! } },
+});
 
+// 2. Define output schema
 const LeadInsights = z.object({
   company_name: z.string(),
   industry: z.string(),
@@ -96,7 +40,8 @@ const LeadInsights = z.object({
   recommended_follow_up: z.enum(['Call', 'Email', 'Event']),
 });
 
-const rows = [
+// 3. Prepare input data
+const leads = [
   {
     leadId: 'lead-101',
     name: 'Acme Analytics',
@@ -107,34 +52,24 @@ const rows = [
     name: 'Bright Logistics',
     notes: 'Regional freight operator asking for pricing via email. 12 depots across the Midwest.',
   },
-  {
-    leadId: 'lead-103',
-    name: 'Nimbus Retail',
-    notes:
-      'Enterprise retailer. Mentioned they will send the procurement team to our booth at NRF.',
-  },
 ];
 
-const response = await nua.list(
-  'Summarize each inbound lead by extracting company_name, industry, company_size bucket (SMB, Mid-market, Enterprise), and the recommended_follow_up channel (Call, Email, or Event) based on their notes.',
+// 4. Execute batch request (sends all rows in a single LLM request)
+const result = await nua.list(
+  'Extract company_name, industry, company_size, and recommended_follow_up from each lead.',
   {
-    input: rows,
+    input: leads,
     primaryKey: 'leadId',
     output: { name: 'leadInsights', schema: LeadInsights },
   }
 );
 
-if (!response.success) {
-  console.error(response.error);
-  return;
+// 5. Access typed output
+if (!result.success) {
+  throw new Error(result.error);
 }
 
-response.data.forEach(({ leadId, leadInsights }) => {
-  // leadInsights satisfies the LeadInsights schema
-  console.log(leadId, leadInsights.company_name, leadInsights.industry, leadInsights.company_size);
-});
-
-console.log(response.data);
+console.log(result.data);
 // -> [
 //   {
 //     leadId: 'lead-101',
@@ -146,143 +81,39 @@ console.log(response.data);
 //     },
 //   },
 //   // ...
-// ];
+// ]
 ```
 
-## API Response
+---
 
-Every call returns a discriminated union. When `success` is `false`, you get an error object. Otherwise `success` is `true`, and `data` contains your typed output along with metadata.
+## Core Methods
 
-**Success**
+### `nua.get(prompt, options?)`
 
-| Field       | Type                                                                  | Description                                        |
-| ----------- | --------------------------------------------------------------------- | -------------------------------------------------- |
-| `success`   | `true`                                                                | Indicates that the request completed successfully. |
-| `data`      | `T` (for `get`) or `Array<{ [pk]: value; [output]: T }>` (for `list`) | The typed result matching your schema.             |
-| `usage`     | `{ promptTokens, completionTokens, totalTokens }`                     | Token usage statistics for the LLM request.        |
-| `model`     | `string`                                                              | The LLM model used for this request.               |
-| `latencyMs` | `number`                                                              | Request latency in milliseconds.                   |
-| `source`    | `'direct'`                                                            | The request ran in this process.                   |
-| `meta`      | `object`                                                              | Which engine answered; see below.                  |
-
-`usage` also has `promptCacheReadTokens` and `promptCacheWriteTokens` when the provider reports them: prompt tokens it read from or wrote to its prompt cache. They are part of `promptTokens`. Cache reads are billed at a steep discount, so keep `prompt` the same on every call of a cast and pass anything that varies in `data`: the prompt and schema come first in what the model sees, and providers cache that repeated start. On Claude, a cast whose prompt never repeats pays a 25% premium on it.
-
-**Metadata** (`meta`):
-
-| Field               | Type                                   | Description                                                                                               |
-| ------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `engine`            | `'http'` \| `'local-agent'`            | Whether an LLM provider's API or a coding agent on this machine answered.                                 |
-| `schemaEnforcement` | `'in-prompt'` \| `'native'`            | Whether the schema was described in the prompt or enforced by the engine. Output is validated either way. |
-| `provider`          | `string`                               | `engine: 'http'` only. The LLM provider.                                                                  |
-| `agent`             | `'claude-code'` \| `'codex'` \| `'pi'` | `engine: 'local-agent'` only. Which coding agent answered.                                                |
-| `costUsdEstimate`   | `number \| undefined`                  | `engine: 'local-agent'` only. The agent's own estimate. On a subscription this is not what you pay.       |
-
-**Error**
-
-| Field       | Type       | Description                         |
-| ----------- | ---------- | ----------------------------------- |
-| `success`   | `false`    | Indicates the request failed.       |
-| `error`     | `string`   | Message describing the error.       |
-| `source`    | `'direct'` | The request ran in this process.    |
-| `latencyMs` | `number`   | Time until failure in milliseconds. |
-
-## SDK API
-
-### Constructors
-
-**`Nua.direct(config)`**
-Creates a client that runs casts in this process. It runs on one of two kinds of engine, chosen by the config.
-
-With API keys for LLM providers:
-
-- `providers: { groq?: { apiKey: string }, cerebras?: { apiKey: string }, gemini?: { apiKey: string }, openrouter?: { apiKey: string }, deepseek?: { apiKey: string } }` – Provider credentials.
-- `model?: ModelInput` – Optional default model. Omit it to use `{ alias: 'fast' }`.
-
-Model inputs are objects, not provider-prefixed strings:
+Generates a single value. Omit `options` to receive a plain `string`, or pass an `output` schema for a typed object or primitive.
 
 ```ts
-await nua.get('Extract the company name', {
-  output: { name: 'companyName', schema: z.string() },
-  model: { provider: 'openrouter', model: 'z-ai/glm-5.3-flash' },
-});
+// Plain string response
+const joke = await nua.get('Tell me a one-line joke');
+if (joke.success) console.log(joke.data); // string
 
-await nua.get('Extract the company name', {
-  output: { name: 'companyName', schema: z.string() },
-  model: { alias: 'fast' },
-});
-```
-
-With a coding agent on this machine (Node.js only):
-
-- `localAgent: LocalAgent` – Created with `localAgent()` or `findLocalAgent()` from `nuabase/local-agent`.
-
-```ts
-import { Nua } from 'nuabase';
-import { detectLocalAgents, findLocalAgent, localAgent } from 'nuabase/local-agent';
-
-const nua = Nua.direct({ localAgent: localAgent({ agent: 'claude-code', model: 'haiku' }) });
-
-// Or use the first agent that is installed and logged in:
-const auto = Nua.direct({ localAgent: await findLocalAgent() });
-
-const agents = await detectLocalAgents();
-// [{ agent: 'claude-code', installed: true, loggedIn: true, version: '...', binaryPath: '...' }, ...]
-```
-
-This runs a coding-agent CLI already installed and logged in on this machine, in its headless mode (`claude -p`, `codex exec`, or `pi --mode json`). Calls use the user's own logged-in subscription or provider login, so no API key is needed. `get()` and `list()` behave as with providers: the output is validated against your schema and typed the same way. `nuabase/local-agent` is a separate entry point so that browser bundles of `nuabase` never include it.
-
-The agent is set up once, when you create it. If you install an agent or log in after that, create a new one.
-
-**`localAgent(config)`** sets up a named agent. It throws right away if the agent's executable cannot be found; if the agent is not logged in, the first call fails with that error.
-
-- `agent: 'claude-code' | 'codex' | 'pi'`
-- `binaryPath?: string` – Path to the agent executable. Defaults to looking it up on `PATH`. On Windows, point this at a native executable; `.cmd` shims are not supported.
-- and the options below.
-
-**`findLocalAgent(options?)`** returns a promise of the first agent that is installed and logged in, trying Claude Code first. It rejects when there is none. Checking runs each CLI's version and login-status commands, which make no model calls.
-
-Options for both:
-
-- `model?: string` – The agent's own model name, e.g. `'haiku'` for Claude Code, for calls that name no model. Defaults to the agent's default. Per-call `model: { alias }` works for aliases the agent understands (`haiku`, `sonnet`, `opus` for Claude Code). Codex and Pi have no aliases: pass one of their own model names, and for Pi a `provider/id` name such as `'openrouter/z-ai/glm-5.3-flash'`.
-- `timeoutMs?: number` – Per-call limit. Defaults to `180000`.
-- `concurrency?: number` – Maximum agent processes at once. Defaults to `2`.
-- `auth?: 'subscription' | 'inherit'` – `subscription` (default) hides `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` and similar variables from the agent so it bills the logged-in plan rather than an API key.
-- `logger?` – An object with `debug`, `info`, `warn` and `error` methods, where calls and retries are logged. Defaults to the console.
-
-How it works: each call runs the agent in a fresh, empty temporary directory with its tools, project settings and MCP servers turned off. The schema is wrapped as `{ value: ... }` (the agents require an object at the top level) and passed to the agent's own schema option. Codex only accepts OpenAI strict-mode schemas, so a schema with optional properties or open-ended objects is instead described in the prompt, and the output is validated as usual. Pi has no schema flag at all, so its schemas are always described in the prompt. If an agent rejects a schema, the call is retried with the schema in the prompt. `maxTokens` has no CLI equivalent and is ignored. Calls count against the user's plan limits; check each vendor's terms before offering this to other users.
-
-### Methods
-
-**`nua.get(prompt)`**
-Returns a simple string response from the LLM.
-
-```ts
-const result = await nua.get('Tell me a joke');
-if (result.success) console.log(result.data); // string
-```
-
-**`nua.get(prompt, options)`**
-Returns a typed single value. Parameters:
-
-- `prompt: string` – Natural-language instructions sent to the LLM.
-- `options.input?: unknown` – Optional input data to include in the prompt.
-- `options.output: { name: string; schema: ZodSchema }` – Output name and Zod schema.
-
-```ts
-const result = await nua.get('Extract the address', {
-  input: '123 Main St, Springfield, IL 62701',
+// Typed structured response
+const address = await nua.get('Extract the postal address', {
+  input: 'Ship to 123 Main St, Springfield, IL 62701',
   output: { name: 'address', schema: AddressSchema },
 });
-if (result.success) console.log(result.data); // typed as z.infer<typeof AddressSchema>
+if (address.success) console.log(address.data); // z.infer<typeof AddressSchema>
 ```
 
-**`nua.list(prompt, options)`**
-Processes an array of items. Parameters:
+**Options:**
 
-- `prompt: string` – Natural-language instructions for each item.
-- `options.input: Array<Record<string, unknown>>` – Rows to process.
-- `options.primaryKey: string` – Field that uniquely identifies each row.
-- `options.output: { name: string; schema: ZodSchema }` – Output configuration.
+* `input?: unknown` – Context or data to include with the prompt.
+* `output: { name: string; schema: ZodSchema }` – Identifier and Zod schema for the output.
+* `model?: ModelInput` – Override the client's default model for this call.
+
+### `nua.list(prompt, options)`
+
+Processes an array of records in a **single request**. Each returned row carries the `primaryKey` value the model echoed back, next to the output. Rows can come back in a different order than the input, so match them to your input by key.
 
 ```ts
 const result = await nua.list('Classify each lead', {
@@ -290,27 +121,182 @@ const result = await nua.list('Classify each lead', {
   primaryKey: 'id',
   output: { name: 'classification', schema: ClassificationSchema },
 });
+
 if (result.success) {
   result.data.forEach((row) => console.log(row.id, row.classification));
 }
 ```
 
-## Next Steps
+**Options:**
 
-- Read the full docs at https://docs.nuabase.com.
+* `input: Array<Record<string, unknown>>` – Array of objects to process.
+* `primaryKey: string` – Unique key on each input object. Each output row carries it, so you can match rows to inputs.
+* `output: { name: string; schema: ZodSchema }` – Property name and Zod schema attached to each returned row.
+* `model?: ModelInput` – Override the client's default model for this call.
 
-## Support
+---
 
-Email us at [hello@nuabase.com](mailto:hello@nuabase.com). On X at [@NuabaseHQ](x.com/NuabaseHQ).
+## Client Configuration (`Nua.direct`)
 
-## Tests
+`Nua.direct(config)` runs in-process using one of two execution engines: **HTTP Providers** or a **Local Coding Agent**.
 
-See [TESTING.md](TESTING.md)
+### 1. HTTP Providers
 
-## Credits
+Call LLM APIs directly using your own API keys:
 
-The template for this package comes from https://github.com/rtivital/ts-package-template
+```ts
+const nua = Nua.direct({
+  providers: {
+    groq: { apiKey: '...' },
+    cerebras: { apiKey: '...' },
+    gemini: { apiKey: '...' },
+    openrouter: { apiKey: '...' },
+    deepseek: { apiKey: '...' },
+  },
+  model: { alias: 'fast' }, // optional default; defaults to { alias: 'fast' }
+});
+```
 
-## License
+**Specifying Models:**
+Models can be set globally on the client or per-call using either a provider-specific model object or an alias. Each alias lists provider models in a fixed order and uses the first one whose provider you supplied an API key for: `{ alias: 'fast' }` tries Cerebras, then Groq, then OpenRouter. If you have a key for none of an alias's providers, the call fails. Some aliases, such as `sonnet`, only go through OpenRouter.
 
-MIT
+```ts
+// Specific provider and model
+await nua.get('Extract company name', {
+  output: { name: 'companyName', schema: z.string() },
+  model: { provider: 'openrouter', model: 'z-ai/glm-5.3-flash' },
+});
+
+// Provider-agnostic alias
+await nua.get('Extract company name', {
+  output: { name: 'companyName', schema: z.string() },
+  model: { alias: 'fast' },
+});
+```
+
+### 2. Local Coding Agent (Node.js only)
+
+Run prompts through a coding agent CLI already installed and logged in on your machine (`claude -p`, `codex exec`, or `pi --mode json`). This uses your existing CLI login or subscription—no API key required.
+
+Import helpers from `nuabase/local-agent` (kept at a separate entry point so browser bundles stay clean):
+
+```ts
+import { Nua } from 'nuabase';
+import { localAgent, findLocalAgent, detectLocalAgents } from 'nuabase/local-agent';
+
+// Option A: Target a specific agent
+const nua = Nua.direct({
+  localAgent: localAgent({ agent: 'claude-code', model: 'haiku' }),
+});
+
+// Option B: Automatically pick the first installed & logged-in agent (checks Claude Code first)
+const autoNua = Nua.direct({
+  localAgent: await findLocalAgent(),
+});
+
+// Optional: Inspect available agents on the machine (makes no model calls)
+const agents = await detectLocalAgents();
+// -> [{ agent: 'claude-code', installed: true, loggedIn: true, version: '...', binaryPath: '...' }, ...]
+```
+
+**Agent Functions & Options:**
+
+* `localAgent(config)` – Configures a named agent (`'claude-code' | 'codex' | 'pi'`). Throws immediately if the executable isn't found; fails on the first call if not logged in. Note: Agent lookup happens once at creation.
+* `findLocalAgent(options?)` – Checks version and login status across supported CLIs (without making model calls) and resolves to the first ready agent, or rejects if none are available.
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `agent` | `'claude-code' \| 'codex' \| 'pi'` | Required for `localAgent()` | Which CLI agent to run. |
+| `binaryPath` | `string` | Looked up on `PATH` | Path to executable (`localAgent` only). On Windows, point to a native executable (`.cmd` shims are not supported). |
+| `model` | `string` | Agent's default | The agent's own model name for calls that name no model. Claude Code accepts aliases (`'haiku'`, `'sonnet'`, `'opus'`), and so does a per-call `model: { alias }`. Codex and Pi have no aliases: Codex uses its own model names; Pi uses `'provider/id'` (e.g., `'openrouter/z-ai/glm-5.3-flash'`). |
+| `timeoutMs` | `number` | `180000` | Maximum execution time per call in milliseconds. |
+| `concurrency` | `number` | `2` | Maximum concurrent agent processes. |
+| `auth` | `'subscription' \| 'inherit'` | `'subscription'` | `'subscription'` strips env vars like `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` so calls bill your logged-in plan instead of API keys. |
+| `logger` | object | `console` | Object with `debug`, `info`, `warn`, and `error` methods for call and retry logs. |
+
+> **Note:** Local agent calls count against your personal subscription limits. Check each vendor's terms before exposing local-agent execution to end users.
+
+---
+
+## Response Format & Error Handling
+
+Every `get()` and `list()` call returns a discriminated union (`result.success`). Every failure of the LLM call itself comes back as `success: false`.
+
+The call rejects (throws) only for invalid arguments, before anything is sent: an empty prompt, a non-array `input`, an empty `primaryKey`, or a Zod schema that JSON Schema can't express (such as `.transform()` or `z.date()`).
+
+### Success (`result.success === true`)
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `success` | `true` | Request succeeded and passed schema validation. |
+| `data` | `T` or `Array<{ [pk]: K } & { [output]: T }>` | Validated output matching your schema. |
+| `usage` | `{ promptTokens, completionTokens, totalTokens, promptCacheReadTokens?, promptCacheWriteTokens? }` | Token usage stats (`promptCache*` included when reported by the provider as subsets of `promptTokens`). |
+| `model` | `string` | What answered: `provider:model` (e.g., `openrouter:z-ai/glm-5.3-flash`) or `agent:model` (e.g., `claude-code:haiku`; `default` when the agent's model isn't known). |
+| `latencyMs` | `number` | Total request duration in milliseconds, including retries. |
+| `source` | `'direct'` | Indicates the request executed in-process. |
+| `meta` | `DirectMeta` | Execution details (see table below). |
+
+**`DirectMeta` (`result.meta`):**
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `engine` | `'http' \| 'local-agent'` | Execution engine used. |
+| `schemaEnforcement` | `'native' \| 'in-prompt'` | Whether the engine enforced the schema natively or via prompt instructions. The output is validated either way. |
+| `provider` | `string` | *(`engine: 'http'` only)* LLM provider name. |
+| `agent` | `'claude-code' \| 'codex' \| 'pi'` | *(`engine: 'local-agent'` only)* Local agent CLI used. |
+| `model` | `string \| undefined` | The provider's model, or the model the agent reported or was asked for (`undefined` when neither is known). |
+| `costUsdEstimate` | `number \| undefined` | *(`engine: 'local-agent'` only)* The CLI's estimated API cost (does not reflect subscription billing). |
+
+### Error (`result.success === false`)
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `success` | `false` | Request failed (see retries below). |
+| `error` | `string` | Error description. |
+| `source` | `'direct'` | Indicates the request executed in-process. |
+| `latencyMs` | `number` | Time elapsed until failure in milliseconds. |
+
+> **💡 Tip: Maximize Prompt Caching**
+> Keep your `prompt` string static across calls and pass dynamic values via `input`. Nuabase places the prompt and schema at the beginning of the payload so providers can cache that prefix. Cache reads are heavily discounted—whereas on providers like Claude, changing the prompt prefix on every call incurs a 25% cache-write premium without ever getting a cache hit.
+
+---
+
+## How It Works Under the Hood
+
+Each `get()` or `list()` call converts your Zod schema to JSON Schema, sends it alongside your prompt and input data, and validates the returned payload against that JSON Schema. Zod checks that JSON Schema can't express, such as `.refine()`, are not applied.
+
+Transient errors and outputs that fail validation are **automatically retried up to 2 times**. Fatal errors fail at once: a bad API key, an agent that isn't logged in, an exhausted quota, a timeout, or a model none of your providers serves.
+
+### HTTP Provider Endpoints
+
+When using `Nua.direct({ providers })`, your process makes 1 HTTPS request per call (plus up to 2 retries) directly to the selected provider:
+
+| Provider | Endpoint |
+| --- | --- |
+| **Groq** | `https://api.groq.com/openai/v1/chat/completions` |
+| **Cerebras** | `https://api.cerebras.ai/v1/chat/completions` |
+| **Gemini** | `https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent` |
+| **OpenRouter** | `https://openrouter.ai/api/v1/chat/completions` |
+| **DeepSeek** | `https://api.deepseek.com/chat/completions` |
+
+OpenRouter is itself a router: it forwards each request to a provider that hosts the model.
+
+### Local Agent Sandboxing & Schema Handling
+
+When using `Nua.direct({ localAgent })`, each call spawns the CLI in a fresh, empty temporary directory with all tools, project settings, and MCP servers disabled.
+
+* **Schema wrapping:** Because agent CLIs require a top-level object, Nuabase wraps your schema as `{ value: ... }` and passes it to the CLI's schema flag.
+* **Fallback to in-prompt schemas:**
+  * **Codex** only accepts OpenAI strict-mode schemas; schemas with optional properties or open-ended objects are injected into the prompt instead.
+  * **Pi** has no native schema flag, so schemas are always described in the prompt.
+  * If any agent rejects a native schema flag, Nuabase automatically retries with the schema injected into the prompt. The output is validated against the JSON Schema either way.
+
+---
+
+## Resources & Community
+
+* **Documentation:** [docs.nuabase.com](https://docs.nuabase.com)
+* **Testing Guide:** [TESTING.md](TESTING.md)
+* **Support:** [hello@nuabase.com](mailto:hello@nuabase.com) | [@NuabaseHQ on X](https://x.com/NuabaseHQ)
+* **Credits:** Package template based on [rtivital/ts-package-template](https://github.com/rtivital/ts-package-template)
+* **License:** MIT
