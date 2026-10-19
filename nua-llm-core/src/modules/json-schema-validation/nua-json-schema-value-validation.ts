@@ -11,7 +11,6 @@ export type ValidationResult = {
  * Returns a closure that validates unknown data and returns a typed ValidationResult.
  */
 export function buildNuaJsonSchemaValueValidation(
-  llmRequestId: string,
   parsedSchema: object,
 ): (json: object) => ValidationResult {
   const ajv = ajvInstances.getInstanceForSchema(parsedSchema);
@@ -31,10 +30,6 @@ export function buildNuaJsonSchemaValueValidation(
           error: errString,
         };
       } else {
-        // logger.error(
-        //   "unexpected-situation. ajvValidation.errors is empty even though validation failed. llmRequest id: ",
-        //   llmRequestId,
-        // );
         return { success: false, error: "Unknown validation error" };
       }
     }

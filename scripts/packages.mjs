@@ -8,9 +8,4 @@ export const PUBLISHED_PACKAGES = [
     dir: "nua-client",
     trackedPaths: ["nua-client", "nua-llm-core"],
   },
-  {
-    // @nuabase/gateway: the Nuabase API client. It does not use nua-llm-core.
-    dir: "nua-gateway",
-    trackedPaths: ["nua-gateway"],
-  },
 ];

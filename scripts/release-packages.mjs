@@ -7,9 +7,8 @@
 //
 // Usage: node scripts/release-packages.mjs [--dry-run] [package-dir...]
 //
-// The packages' tests read what the workspace's mise.toml sets: provider keys
-// and NUA_LOCAL_AGENTS for nuabase, NUABASE_API_URL and NUABASE_API_KEY for
-// @nuabase/gateway. That is why `pnpm release:publish` runs this script through
+// nuabase's tests read what the workspace's mise.toml sets: provider keys and
+// NUA_LOCAL_AGENTS. That is why `pnpm release:publish` runs this script through
 // `mise exec`.
 
 import { spawnSync } from "node:child_process";

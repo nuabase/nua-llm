@@ -63,7 +63,7 @@ export async function runCast<T>(
 ): Promise<CastResult<T>> {
   let validate: (data: object) => ValidationResult;
   try {
-    validate = buildNuaJsonSchemaValueValidation("library-req", request.schema);
+    validate = buildNuaJsonSchemaValueValidation(request.schema);
   } catch (error) {
     return { success: false, error: `Invalid output schema: ${errorMessage(error)}` };
   }

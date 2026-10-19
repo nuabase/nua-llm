@@ -146,7 +146,7 @@ Performs a single LLM call to extract an object matching the schema.
 Maps a list of input rows to one output value each.
 
 *   `input.data`: Array of objects, each holding the primary key.
-*   `output`: A list schema from `listSchema(itemSchema, { primaryKey, outputName })`. It is the schema of the whole result, an array of `{ [primaryKey], [outputName] }` objects, and it names the primary key. A list schema that was stored as JSON can be read back with `parseListSchema(json, { primaryKey, outputName })`, which uses it exactly as stored.
+*   `output`: A list schema from `listSchema(itemSchema, { primaryKey, outputName })`. It is the schema of the whole result, an array of `{ [primaryKey], [outputName] }` objects, and it names the primary key.
 *   **Returns**: `Promise<CastResult<T[]>>`
 
 ### `runAgent(providers, params)`

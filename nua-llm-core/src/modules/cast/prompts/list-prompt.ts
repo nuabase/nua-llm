@@ -15,7 +15,7 @@ const MATCH_PRIMARY_KEYS = [
 ];
 
 // The LLM response seems better (concise and to-the point) when there is an output type name.
-// The in-prompt text is stored with API requests; keep it unchanged.
+// cast-prompts.test.ts pins the in-prompt text; change it only on purpose.
 const SYSTEM_PROMPTS: Record<SchemaEnforcementKind, string> = {
   "in-prompt": [
     ...DESCRIBE_OUTPUT,

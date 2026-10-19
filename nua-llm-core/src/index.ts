@@ -17,11 +17,9 @@ export type {
   SchemaEnforcementKind,
 } from "./modules/engine/llm-engine";
 export type { LocalAgentId } from "./modules/engine/local-agent/agent-id";
-export { validateJsonSchema } from "./modules/json-schema-validation/validate-json-schema";
-export { stableStringify } from "./lib/stable-stringify";
 export * from "./modules/model-info";
 export * from "./lib/schema-utils";
-export { listSchema, parseListSchema } from "./modules/cast/list-schema";
+export { listSchema } from "./modules/cast/list-schema";
 export type { ListRowKeys, ListSchema } from "./modules/cast/list-schema";
 export type { CastResult, CastSuccess, CastFailure } from "./modules/cast/run-cast";
 export type { RenderedPrompt } from "./modules/cast/cast-request";

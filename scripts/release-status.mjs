@@ -1,7 +1,6 @@
 // Prints the release state of this repository as one JSON object on stdout,
 // for the release train in ../sapporta-devtools: one entry per published
-// package in packages.mjs, `nuabase` (nua-client) and `@nuabase/gateway`
-// (nua-gateway). Each counts changes to its own tracked paths.
+// package in packages.mjs. Each counts changes to its own tracked paths.
 //
 // This script only reads. It never commits, pushes or pulls.
 

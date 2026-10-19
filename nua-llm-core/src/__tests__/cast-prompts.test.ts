@@ -1,6 +1,6 @@
 import { renderPrompt } from "../modules/cast/prompts/render-prompt";
 
-// The in-prompt text is saved with API requests, so it must not change by accident.
+// Pins the in-prompt text, so it does not change by accident.
 // These strings are the prompts HEAD produced before native schema enforcement was added.
 
 describe("renderPrompt", () => {

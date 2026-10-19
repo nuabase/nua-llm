@@ -15,8 +15,6 @@ At least one mode must be available, or the tests fail with a message saying so.
 
 Local-agent modes go through `Nua.direct({ localAgent })`, so results report `source: 'direct'`. Calls use that agent's own login and count against its plan. Claude Code runs with `haiku`; Codex with its default model. `auto` uses `findLocalAgent()`.
 
-These tests never call the Nuabase API. Its client, and its tests, are in `../nua-gateway`.
-
 `pnpm test` builds `nua-llm-core` first: the tests, the type check and the bundle all load it from its `dist/`. `pnpm jest` alone uses whatever `dist/` is there.
 
 ## Environment

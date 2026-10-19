@@ -6,7 +6,7 @@
 pnpm test
 ```
 
-No API keys needed. Runs fast. Tests parsing, orchestration, schemas, prompts, and the agent loop with mocked providers, and local-agent setup with the Node binary standing in for a CLI. `cast-prompts.test.ts` pins the in-prompt prompt text, which the API server stores; change it only on purpose.
+No API keys needed. Runs fast. Tests parsing, orchestration, schemas, prompts, and the agent loop with mocked providers, and local-agent setup with the Node binary standing in for a CLI. `cast-prompts.test.ts` pins the in-prompt prompt text; change it only on purpose.
 
 ## Integration tests
 

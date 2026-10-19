@@ -1,4 +1,3 @@
-import { NuaValidationError } from "../../lib/nua-errors";
 import { JsonSchema } from "../../lib/schema-utils";
 
 declare const listSchemaBrand: unique symbol;
@@ -13,8 +12,8 @@ export type ListRowKeys = {
 
 /**
  * The schema of a list cast's result, with the row keys it was built for. Only
- * listSchema() and parseListSchema() make one, so a castArray call cannot be
- * given an item schema by mistake.
+ * listSchema() makes one, so a castArray call cannot be given an item schema by
+ * mistake.
  */
 export type ListSchema = ListRowKeys & {
   readonly [listSchemaBrand]: true;
@@ -49,33 +48,6 @@ export function listSchema(itemSchema: JsonSchema, keys: ListRowKeys): ListSchem
   return brand(keys, jsonSchema);
 }
 
-/**
- * Reads back a list schema that was built by listSchema() and stored as JSON. It is
- * used exactly as stored, so a change to listSchema() does not alter stored ones.
- */
-export function parseListSchema(jsonSchema: unknown, keys: ListRowKeys): ListSchema | NuaValidationError {
-  if (isObject(jsonSchema) && jsonSchema.type === "array" && rowsHoldKeys(jsonSchema.items, keys)) {
-    return brand(keys, jsonSchema);
-  }
-  return {
-    kind: "validation-error",
-    message: `Not a list schema with rows keyed by "${keys.primaryKey}" holding "${keys.outputName}"`,
-  };
-}
-
-/** Whether a list schema's `items` requires both row keys. */
-function rowsHoldKeys(items: unknown, keys: ListRowKeys): boolean {
-  if (!isObject(items) || !isObject(items.properties) || !Array.isArray(items.required)) {
-    return false;
-  }
-  const { properties, required } = items;
-  return [keys.primaryKey, keys.outputName].every((key) => key in properties && required.includes(key));
-}
-
 function brand(keys: ListRowKeys, jsonSchema: JsonSchema): ListSchema {
   return { primaryKey: keys.primaryKey, outputName: keys.outputName, jsonSchema } as ListSchema;
-}
-
-function isObject(value: unknown): value is JsonSchema {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

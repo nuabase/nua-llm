@@ -1,6 +1,3 @@
 packages:
-  - api-server
   - nua-llm-core
-  - nua-llm-caching
   - nua-client
-  - nua-gateway

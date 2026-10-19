@@ -26,7 +26,7 @@ export class ConsoleLogger implements Logger {
 export const generateSpanId = (): string => crypto.randomUUID();
 
 // ============================================================================
-// Shared logging utilities (used by api-server and nua-llm-core)
+// Shared logging utilities
 // ============================================================================
 
 /**
