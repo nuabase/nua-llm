@@ -35,6 +35,13 @@ export type AgentReply =
     }
   | { kind: "failed"; failure: AttemptFailure };
 
+/**
+ * Who approves an interactive session's edits and commands:
+ * - ask: the user, step by step, as the CLI does by default.
+ * - auto: the CLI's own auto mode. Its reviewer approves routine steps and stops risky ones.
+ */
+export type SessionApproval = "ask" | "auto";
+
 export type AgentLoginStatus = {
   loggedIn: boolean;
   detail?: string;
@@ -61,4 +68,11 @@ export interface AgentAdapter {
 
   loginStatusArgs: string[];
   readLoginStatus(result: AgentProcessResult): AgentLoginStatus;
+
+  /**
+   * Options for an interactive session in the user's own project, which go
+   * before its first message. `model` is the CLI's own model name; undefined
+   * uses the CLI's default.
+   */
+  sessionArgs(model: string | undefined, approval: SessionApproval): string[];
 }

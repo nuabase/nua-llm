@@ -124,6 +124,14 @@ export const codexAdapter: AgentAdapter = {
     const detail = `${result.stdout}\n${result.stderr}`.trim();
     return { loggedIn: result.exitCode === 0, detail };
   },
+
+  sessionArgs(model, approval) {
+    // Codex's auto review keeps it in the workspace-write sandbox.
+    return [
+      ...(model === undefined ? [] : ["--model", model]),
+      ...(approval === "auto" ? ["--approve-for-me"] : []),
+    ];
+  },
 };
 
 function parseEvents(stdout: string): CodexEvent[] {

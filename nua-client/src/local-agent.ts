@@ -3,17 +3,27 @@
 // runtimes (such as Cloudflare Workers or Vercel Edge).
 
 export {
+  agentSessionMode,
   detectLocalAgents,
   findLocalAgent,
+  fitsAgentSession,
   isLocalAgentId,
   LOCAL_AGENT_IDS,
   localAgent,
+  openInTerminal,
+  sessionLauncher,
+  writeAgentSession,
 } from 'nua-llm-core/local-agent';
 export type {
+  AgentSessionConfig,
+  AgentSessionFiles,
+  AgentSessionMode,
   LocalAgent,
   LocalAgentAuthMode,
   LocalAgentConfig,
   LocalAgentId,
   LocalAgentOptions,
   LocalAgentStatus,
+  SessionApproval,
+  SessionLauncherTarget,
 } from 'nua-llm-core/local-agent';

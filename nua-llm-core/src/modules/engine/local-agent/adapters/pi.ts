@@ -189,6 +189,15 @@ export const piAdapter: AgentAdapter = {
       detail: "installed; auth is verified on the first call",
     };
   },
+
+  sessionArgs(model, approval) {
+    // Pi asks for no per-tool approval. `--approve` trusts the project's local
+    // files, which lets the session load AGENTS.md without stopping at a trust prompt.
+    return [
+      ...(model === undefined ? [] : ["--model", model]),
+      ...(approval === "auto" ? ["--approve"] : []),
+    ];
+  },
 };
 
 function failed(failure: AttemptFailure): AgentReply {

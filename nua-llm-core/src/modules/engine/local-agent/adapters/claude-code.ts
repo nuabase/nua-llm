@@ -150,4 +150,11 @@ export const claudeCodeAdapter: AgentAdapter = {
       return { loggedIn: false, detail: stderrTail(result) || result.stdout.trim() };
     }
   },
+
+  sessionArgs(model, approval) {
+    return [
+      ...(model === undefined ? [] : ["--model", model]),
+      ...(approval === "auto" ? ["--permission-mode", "auto"] : []),
+    ];
+  },
 };

@@ -216,6 +216,47 @@ const agents = await detectLocalAgents();
 
 > **Note:** Local agent calls count against your personal subscription limits. Check each vendor's terms before exposing local-agent execution to end users.
 
+### Interactive Agent Sessions (Node.js only)
+
+Hand a prompt to the user's coding agent as an interactive session they carry on in a terminal, in their own project (unlike casts, which run in an empty sandbox):
+
+```ts
+import { agentSessionMode, openInTerminal, writeAgentSession } from 'nuabase/local-agent';
+
+const session = writeAgentSession({
+  agent: 'claude-code',
+  cwd: '/path/to/project',
+  model: 'opus',
+  approval: 'auto',
+  prompt: 'Fix the failing import described in notes.md',
+  dir: '/path/to/project/tmp/agent-sessions',
+  name: '2026-10-22-fix-import',
+});
+// -> { promptPath: '.../2026-10-22-fix-import.md', launcherPath: '.../2026-10-22-fix-import.command', command: "sh '...'" }
+
+if (agentSessionMode() === 'terminal') await openInTerminal(session.launcherPath);
+else console.log(`Run in a terminal: ${session.command}`);
+```
+
+The prompt goes in its own file (`0600`), and the launcher (`0700`) passes it to the agent as one argument after `--`. Quotes, backticks and `$NAMES` in the prompt reach the agent as written, and the prompt can't set the agent's flags or run commands. Neither file is ever overwritten or deleted.
+
+* `writeAgentSession(config)` – Writes the prompt and launcher. Throws if the agent isn't found, on Windows, or for a prompt that `fitsAgentSession()` refuses.
+* `openInTerminal(launcherPath)` – Runs the launcher in a new window of the user's terminal app (macOS `open`, which needs no Automation permission). Rejects on other platforms.
+* `agentSessionMode(platform?)` – `'terminal'` on macOS, `'command'` on other POSIX systems (show the user `command`), `'none'` on Windows.
+* `fitsAgentSession(prompt, platform?)` – `false` for a prompt of 128 KiB or more on Linux, which caps a single argument at that size.
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `agent` | `'claude-code' \| 'codex' \| 'pi'` | Required | Which CLI agent to start. |
+| `binaryPath` | `string` | Looked up on `PATH` | Path to the executable. The launcher runs it by this absolute path, whatever the terminal's `PATH`. |
+| `cwd` | `string` | Required | The project the agent works in. It loads the project's `AGENTS.md` / `CLAUDE.md`. |
+| `model` | `string` | Agent's default | The agent's own model name. |
+| `approval` | `'ask' \| 'auto'` | `'ask'` | `'auto'` starts the agent's auto mode (Claude Code `--permission-mode auto`, Codex `--approve-for-me`, Pi `--approve`). Its reviewer, not the user, approves routine edits and commands, and stops risky ones. |
+| `prompt` | `string` | Required | The session's first message. |
+| `dir` | `string` | Required | Where both files are written. Created if missing. |
+| `name` | `string` | Required | The files' name without extension. |
+| `platform` | `NodeJS.Platform` | `process.platform` | The platform the launcher is for. |
+
 ---
 
 ## Response Format & Error Handling
