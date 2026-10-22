@@ -26,8 +26,9 @@ export type DirectConfig =
   | { providers: ProviderApiKeys; model?: ModelInput; localAgent?: never }
   | { localAgent: LocalAgent; providers?: never; model?: never };
 
-export type OutputDef<TSchema extends z.ZodTypeAny> = {
-  name: string;
+/** `name` is the field each answer goes in; a literal name types list() rows by it. */
+export type OutputDef<TSchema extends z.ZodTypeAny, TName extends string = string> = {
+  name: TName;
   schema: TSchema;
 };
 
@@ -41,18 +42,23 @@ export type ListOptions<
   TSchema extends z.ZodTypeAny,
   TData extends Record<string, unknown>,
   PrimaryKey extends keyof TData & string,
+  TName extends string = string,
 > = {
   input: TData[];
   primaryKey: PrimaryKey;
-  output: OutputDef<TSchema>;
+  output: OutputDef<TSchema, TName>;
   model?: ModelInput;
 };
 
 // Result row for list operations: primaryKey + output field
-export type ListResultRow<TSchema extends z.ZodTypeAny, PrimaryKey extends string> = {
+export type ListResultRow<
+  TSchema extends z.ZodTypeAny,
+  PrimaryKey extends string,
+  TName extends string = string,
+> = {
   [K in PrimaryKey]: string | number;
 } & {
-  [outputName: string]: z.infer<TSchema>;
+  [K in TName]: z.infer<TSchema>;
 };
 
 // ========== Nua Class ==========
@@ -108,10 +114,11 @@ export class Nua {
     TSchema extends z.ZodTypeAny,
     TData extends Record<string, unknown>,
     PrimaryKey extends keyof TData & string,
+    TName extends string = string,
   >(
     prompt: string,
-    options: ListOptions<TSchema, TData, PrimaryKey>
-  ): Promise<CastResult<ListResultRow<TSchema, PrimaryKey>[]>> {
+    options: ListOptions<TSchema, TData, PrimaryKey, TName>
+  ): Promise<CastResult<ListResultRow<TSchema, PrimaryKey, TName>[]>> {
     if (typeof prompt !== 'string' || prompt.trim() === '') {
       throw new TypeError('Prompt must be a non-empty string');
     }
@@ -130,7 +137,7 @@ export class Nua {
     });
 
     const startTime = Date.now();
-    const result = await this.client.castArray<ListResultRow<TSchema, PrimaryKey>>({
+    const result = await this.client.castArray<ListResultRow<TSchema, PrimaryKey, TName>>({
       model: options.model,
       input: { prompt, data: options.input },
       output,
