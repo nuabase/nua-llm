@@ -27,7 +27,7 @@ export const codexAdapter: AgentAdapter = {
     return toStrictSchema(envelopeSchema);
   },
 
-  buildInvocation(request: AttemptRequest, model: string | undefined) {
+  buildInvocation(request: AttemptRequest, { model, effort }) {
     // Codex has no flag to remove its tools. The empty working directory and
     // the read-only sandbox keep it from touching anything.
     const args = [
@@ -39,14 +39,15 @@ export const codexAdapter: AgentAdapter = {
       "--ignore-rules",
       "--sandbox",
       "read-only",
-      "-c",
-      "model_reasoning_effort=low",
       "--json",
       "-o",
       LAST_MESSAGE_FILE,
     ];
     if (model !== undefined) {
       args.push("-m", model);
+    }
+    if (effort !== undefined) {
+      args.push("-c", `model_reasoning_effort=${effort}`);
     }
     const files: { name: string; content: string }[] = [];
     if (request.enforcement.kind === "native") {

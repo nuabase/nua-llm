@@ -1,6 +1,6 @@
 import { ConsoleLogger, Logger } from "../../../lib/logger";
 import { AGENT_ADAPTERS } from "./adapters";
-import { AgentAdapter } from "./adapters/types";
+import { AgentAdapter, AgentEffort } from "./adapters/types";
 import { isLocalAgentId, LocalAgentId } from "./agent-id";
 import { detectLocalAgents } from "./detect";
 import { LocalAgent } from "./local-agent";
@@ -17,6 +17,8 @@ export type LocalAgentAuthMode = "subscription" | "inherit";
 export type LocalAgentOptions = {
   /** The agent's own model name (e.g. "haiku" for Claude Code) for calls that name no model. Defaults to the agent's default. */
   model?: string;
+  /** How hard the model thinks, as the CLI's own reasoning or effort setting. Defaults to the CLI's default. */
+  effort?: AgentEffort;
   /** Per-call limit in milliseconds. Defaults to 180000. */
   timeoutMs?: number;
   /** Maximum agent processes running at once. Defaults to 2. */
@@ -76,6 +78,7 @@ export async function findLocalAgent(options: LocalAgentOptions = {}): Promise<L
 
 type Settings = {
   model: string | undefined;
+  effort: AgentEffort | undefined;
   timeoutMs: number;
   concurrency: number;
   auth: LocalAgentAuthMode;
@@ -92,6 +95,7 @@ function parseOptions(options: LocalAgentOptions): Settings {
   }
   return {
     model: options.model,
+    effort: options.effort,
     timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
     concurrency,
     auth: options.auth ?? "subscription",
@@ -112,10 +116,13 @@ function setUpLocalAgent(adapter: AgentAdapter, binaryPath: string, settings: Se
   const runner = {
     adapter,
     binaryPath,
-    timeoutMs: settings.timeoutMs,
     unsetEnv: settings.auth === "subscription" ? adapter.apiKeyEnvVars : [],
     limiter: new Semaphore(settings.concurrency),
     logger: settings.logger,
   };
-  return new LocalAgent(runner, settings.model);
+  return new LocalAgent(runner, {
+    model: settings.model,
+    effort: settings.effort,
+    timeoutMs: settings.timeoutMs,
+  });
 }

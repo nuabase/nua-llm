@@ -36,6 +36,19 @@ export type AgentReply =
   | { kind: "failed"; failure: AttemptFailure };
 
 /**
+ * How hard the agent's model thinks before it answers: the CLI's own reasoning
+ * or effort setting, at one of the levels every supported CLI has.
+ */
+export type AgentEffort = "low" | "medium" | "high";
+
+/** How one cast runs on an agent. An undefined field leaves it to the CLI's default. */
+export type AgentCallOptions = {
+  /** The CLI's own model name. */
+  model?: string;
+  effort?: AgentEffort;
+};
+
+/**
  * Who approves an interactive session's edits and commands:
  * - ask: the user, step by step, as the CLI does by default.
  * - auto: the CLI's own auto mode. Its reviewer approves routine steps and stops risky ones.
@@ -62,8 +75,7 @@ export interface AgentAdapter {
 
   /** The envelope schema in the form this CLI accepts, or null if it can't enforce it. */
   nativeSchema(envelopeSchema: JsonSchema): JsonSchema | null;
-  /** `model` is the CLI's own model name; undefined uses the CLI's default. */
-  buildInvocation(request: AttemptRequest, model: string | undefined): AgentInvocation;
+  buildInvocation(request: AttemptRequest, options: AgentCallOptions): AgentInvocation;
   readResult(result: AgentProcessResult, request: AttemptRequest): AgentReply;
 
   loginStatusArgs: string[];

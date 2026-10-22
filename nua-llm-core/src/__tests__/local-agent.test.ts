@@ -2,7 +2,7 @@ import { Logger } from "../lib/logger";
 import { runAgent } from "../modules/agent/run-agent";
 import { claudeCodeAdapter } from "../modules/engine/local-agent/adapters/claude-code";
 import { codexAdapter } from "../modules/engine/local-agent/adapters/codex";
-import { AgentAdapter } from "../modules/engine/local-agent/adapters/types";
+import { AgentAdapter, AgentCallOptions } from "../modules/engine/local-agent/adapters/types";
 import { localAgent } from "../modules/engine/local-agent/create-local-agent";
 import { LocalAgent } from "../modules/engine/local-agent/local-agent";
 import { Semaphore } from "../modules/engine/local-agent/semaphore";
@@ -16,16 +16,21 @@ const silentLogger: Logger = {
 };
 
 /**
- * A local agent whose CLI is the running Node binary: each attempt prints nothing
- * and the adapter answers "7", recording the model it was asked to invoke.
+ * A local agent whose CLI is the running Node binary, running `script`: each
+ * attempt prints nothing and the adapter answers "7", recording the model and
+ * effort it was asked to invoke.
  */
-function stubAgent(adapter: AgentAdapter, defaultModel: string | undefined) {
-  const invokedModels: (string | undefined)[] = [];
+function stubAgent(
+  adapter: AgentAdapter,
+  defaultModel: string | undefined,
+  { concurrency = 1, script = "" }: { concurrency?: number; script?: string } = {},
+) {
+  const invoked: AgentCallOptions[] = [];
   const recordingAdapter: AgentAdapter = {
     ...adapter,
-    buildInvocation: (_request, model) => {
-      invokedModels.push(model);
-      return { args: ["-e", ""], stdin: "" };
+    buildInvocation: (_request, options) => {
+      invoked.push(options);
+      return { args: ["-e", script], stdin: "" };
     },
     readResult: () => ({
       kind: "answered",
@@ -39,14 +44,14 @@ function stubAgent(adapter: AgentAdapter, defaultModel: string | undefined) {
     {
       adapter: recordingAdapter,
       binaryPath: process.execPath,
-      timeoutMs: 10_000,
       unsetEnv: [],
-      limiter: new Semaphore(1),
+      limiter: new Semaphore(concurrency),
       logger: silentLogger,
     },
-    defaultModel,
+    { model: defaultModel, timeoutMs: 10_000 },
   );
-  return { agent, invokedModels };
+  const invokedModels = () => invoked.map((options) => options.model);
+  return { agent, invoked, invokedModels };
 }
 
 /** Routes `model` on `agent`, runs one attempt, and returns the origin it reports. */
@@ -67,19 +72,19 @@ describe("LocalAgent.route", () => {
   it("runs the configured default model when a call names none", async () => {
     const { agent, invokedModels } = stubAgent(claudeCodeAdapter, "sonnet");
     expect(await originOfAttempt(agent, undefined)).toMatchObject({ agent: "claude-code", model: "sonnet" });
-    expect(invokedModels).toEqual(["sonnet"]);
+    expect(invokedModels()).toEqual(["sonnet"]);
   });
 
   it("leaves the model to the CLI when nothing is configured", async () => {
     const { agent, invokedModels } = stubAgent(codexAdapter, undefined);
     expect(await originOfAttempt(agent, undefined)).toMatchObject({ agent: "codex", model: undefined });
-    expect(invokedModels).toEqual([undefined]);
+    expect(invokedModels()).toEqual([undefined]);
   });
 
   it("runs an alias as the CLI's own model name", async () => {
     const { agent, invokedModels } = stubAgent(claudeCodeAdapter, "sonnet");
     await originOfAttempt(agent, { alias: "haiku" });
-    expect(invokedModels).toEqual(["haiku"]);
+    expect(invokedModels()).toEqual(["haiku"]);
   });
 
   it("cannot route an alias the CLI has no equivalent for", () => {
@@ -103,6 +108,45 @@ describe("LocalAgent.route", () => {
       kind: "unroutable",
       message: expect.stringMatching(/model aliases, not provider models/),
     });
+  });
+});
+
+describe("LocalAgent.with", () => {
+  it("runs the model and effort it is given, leaving the agent it came from as it was", async () => {
+    const { agent, invoked } = stubAgent(codexAdapter, "sample-model");
+    await originOfAttempt(agent.with({ model: "sample-other-model", effort: "low" }), undefined);
+    await originOfAttempt(agent, undefined);
+    expect(invoked).toEqual([
+      { model: "sample-other-model", effort: "low" },
+      { model: "sample-model", effort: undefined },
+    ]);
+  });
+
+  it("keeps what it isn't given, and runs the CLI's default model when given undefined", async () => {
+    const { agent, invoked } = stubAgent(codexAdapter, "sample-model");
+    const low = agent.with({ effort: "low" });
+    await originOfAttempt(low, undefined);
+    await originOfAttempt(low.with({ model: undefined }), undefined);
+    expect(invoked).toEqual([
+      { model: "sample-model", effort: "low" },
+      { model: undefined, effort: "low" },
+    ]);
+  });
+
+  it("shares one limit on processes running at once across the agents made from it", async () => {
+    const { agent } = stubAgent(codexAdapter, undefined, { script: "setTimeout(() => {}, 300)" });
+    const started = Date.now();
+    await Promise.all([
+      originOfAttempt(agent.with({ model: "sample-model" }), undefined),
+      originOfAttempt(agent.with({ model: "sample-other-model" }), undefined),
+    ]);
+    // With a limit of one, the second process starts only once the first has ended.
+    expect(Date.now() - started).toBeGreaterThanOrEqual(600);
+  });
+
+  it("rejects an empty model", () => {
+    const { agent } = stubAgent(codexAdapter, undefined);
+    expect(() => agent.with({ model: " " })).toThrow(/non-empty/);
   });
 });
 

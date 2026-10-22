@@ -13,6 +13,7 @@ export {
   startAgentSession,
 } from 'nua-llm-core/local-agent';
 export type {
+  AgentEffort,
   AgentSessionConfig,
   AgentSessionFiles,
   AgentSessionMode,
@@ -20,6 +21,7 @@ export type {
   AgentSessionStart,
   LocalAgent,
   LocalAgentAuthMode,
+  LocalAgentCallOptions,
   LocalAgentConfig,
   LocalAgentId,
   LocalAgentOptions,

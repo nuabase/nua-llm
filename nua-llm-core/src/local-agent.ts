@@ -8,7 +8,7 @@ export type {
   LocalAgentConfig,
   LocalAgentOptions,
 } from "./modules/engine/local-agent/create-local-agent";
-export type { LocalAgent } from "./modules/engine/local-agent/local-agent";
+export type { LocalAgent, LocalAgentCallOptions } from "./modules/engine/local-agent/local-agent";
 export type { Logger } from "./lib/logger";
 export { detectLocalAgents } from "./modules/engine/local-agent/detect";
 export type { LocalAgentStatus } from "./modules/engine/local-agent/detect";
@@ -23,4 +23,4 @@ export type {
   AgentSessionStart,
   SessionLauncherTarget,
 } from "./modules/engine/local-agent/session";
-export type { SessionApproval } from "./modules/engine/local-agent/adapters/types";
+export type { AgentEffort, SessionApproval } from "./modules/engine/local-agent/adapters/types";

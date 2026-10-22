@@ -38,7 +38,7 @@ export const claudeCodeAdapter: AgentAdapter = {
     return envelopeSchema;
   },
 
-  buildInvocation(request: AttemptRequest, model: string | undefined) {
+  buildInvocation(request: AttemptRequest, { model, effort }) {
     // Never pass --bare: it skips the keychain, so the subscription login is not used.
     const args = [
       "-p",
@@ -55,6 +55,9 @@ export const claudeCodeAdapter: AgentAdapter = {
     ];
     if (model !== undefined) {
       args.push("--model", model);
+    }
+    if (effort !== undefined) {
+      args.push("--effort", effort);
     }
     if (request.enforcement.kind === "native") {
       args.push("--json-schema", JSON.stringify(request.enforcement.schema));

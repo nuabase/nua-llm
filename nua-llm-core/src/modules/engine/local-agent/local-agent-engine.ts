@@ -1,7 +1,7 @@
 import { generateSpanId, logLlmCallError, Logger } from "../../../lib/logger";
 import { JsonSchema } from "../../../lib/schema-utils";
 import { AttemptFailure, AttemptOutcome, AttemptRequest, LlmEngine } from "../llm-engine";
-import { AgentAdapter, AgentProcessResult } from "./adapters/types";
+import { AgentAdapter, AgentCallOptions, AgentProcessResult } from "./adapters/types";
 import { runInvocation } from "./process-runner";
 import { Semaphore } from "./semaphore";
 
@@ -9,13 +9,17 @@ import { Semaphore } from "./semaphore";
 export type AgentRunner = {
   adapter: AgentAdapter;
   binaryPath: string;
-  /** Per-attempt limit. */
-  timeoutMs: number;
   /** Env vars removed from the agent's environment. */
   unsetEnv: string[];
   /** Bounds how many agent processes run at once, across all models. */
   limiter: Semaphore;
   logger: Logger;
+};
+
+/** How one engine's attempts run: the CLI's options and how long each may take. */
+export type AgentCall = AgentCallOptions & {
+  /** Per-attempt limit. */
+  timeoutMs: number;
 };
 
 /**
@@ -25,8 +29,7 @@ export type AgentRunner = {
 export class LocalAgentEngine implements LlmEngine {
   constructor(
     private readonly runner: AgentRunner,
-    /** The CLI's own model name; undefined uses the CLI's default. */
-    private readonly model: string | undefined,
+    private readonly call: AgentCall,
   ) {}
 
   nativeSchema(envelopeSchema: JsonSchema): JsonSchema | null {
@@ -38,7 +41,8 @@ export class LocalAgentEngine implements LlmEngine {
   }
 
   private async runAgent(request: AttemptRequest): Promise<AttemptOutcome> {
-    const { adapter, binaryPath, logger, timeoutMs, unsetEnv } = this.runner;
+    const { adapter, binaryPath, logger, unsetEnv } = this.runner;
+    const { model, effort, timeoutMs } = this.call;
     const spanId = generateSpanId();
     const startTime = Date.now();
     const method = request.enforcement.kind;
@@ -50,7 +54,7 @@ export class LocalAgentEngine implements LlmEngine {
       service: adapter.id,
       method,
       binaryPath,
-      model: this.model ?? "default",
+      model: model ?? "default",
     });
 
     const failed = (failure: AttemptFailure): AttemptOutcome => {
@@ -62,7 +66,7 @@ export class LocalAgentEngine implements LlmEngine {
     try {
       result = await runInvocation({
         binaryPath,
-        invocation: adapter.buildInvocation(request, this.model),
+        invocation: adapter.buildInvocation(request, { model, effort }),
         timeoutMs,
         unsetEnv,
       });
@@ -96,7 +100,7 @@ export class LocalAgentEngine implements LlmEngine {
       origin: {
         engine: "local-agent",
         agent: adapter.id,
-        model: reply.model ?? this.model,
+        model: reply.model ?? model,
         costUsdEstimate: reply.costUsdEstimate,
       },
     };

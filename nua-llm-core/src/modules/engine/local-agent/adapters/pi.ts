@@ -93,7 +93,7 @@ export const piAdapter: AgentAdapter = {
     return null;
   },
 
-  buildInvocation(request: AttemptRequest, model: string | undefined) {
+  buildInvocation(request: AttemptRequest, { model, effort }) {
     const args = [
       "--mode",
       "json",
@@ -111,6 +111,9 @@ export const piAdapter: AgentAdapter = {
     ];
     if (model !== undefined) {
       args.push("--model", model);
+    }
+    if (effort !== undefined) {
+      args.push("--thinking", effort);
     }
     // Pi prepends piped stdin to the first prompt, so the prompt stays on stdin
     // rather than an argv positional (which would hit argv length limits).

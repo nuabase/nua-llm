@@ -50,7 +50,7 @@ describe("claudeCodeAdapter", () => {
   };
 
   it("builds a tool-less invocation that keeps the subscription login", () => {
-    const invocation = claudeCodeAdapter.buildInvocation(nativeRequest, "haiku");
+    const invocation = claudeCodeAdapter.buildInvocation(nativeRequest, { model: "haiku" });
     expect(invocation.args).toEqual(expect.arrayContaining(["-p", "--no-session-persistence"]));
     expect(invocation.args).not.toContain("--bare");
     expect(invocation.args[invocation.args.indexOf("--tools") + 1]).toBe("");
@@ -62,7 +62,7 @@ describe("claudeCodeAdapter", () => {
   });
 
   it("omits model and schema flags for an in-prompt request with the default model", () => {
-    const invocation = claudeCodeAdapter.buildInvocation(inPromptRequest, undefined);
+    const invocation = claudeCodeAdapter.buildInvocation(inPromptRequest, {});
     expect(invocation.args).not.toContain("--model");
     expect(invocation.args).not.toContain("--json-schema");
   });
@@ -163,7 +163,7 @@ describe("codexAdapter", () => {
   const jsonl = (events: object[]) => events.map((e) => JSON.stringify(e)).join("\n");
 
   it("writes the schema to a file and reads the last message back", () => {
-    const invocation = codexAdapter.buildInvocation(nativeRequest, undefined);
+    const invocation = codexAdapter.buildInvocation(nativeRequest, {});
     expect(invocation.args.slice(0, 2)).toEqual(["exec", "-"]);
     expect(invocation.args).toEqual(expect.arrayContaining(["--ephemeral", "--ignore-user-config", "read-only"]));
     expect(invocation.args).not.toContain("-m");
@@ -279,7 +279,7 @@ describe("piAdapter", () => {
   const jsonl = (events: object[]) => events.map((e) => JSON.stringify(e)).join("\n");
 
   it("builds a tool-less, session-less invocation with the prompt on stdin", () => {
-    const invocation = piAdapter.buildInvocation(nativeRequest, "openrouter/~deepseek/deepseek-flash-latest");
+    const invocation = piAdapter.buildInvocation(nativeRequest, { model: "openrouter/~deepseek/deepseek-flash-latest" });
     expect(invocation.args).toEqual(
       expect.arrayContaining(["--mode", "json", "--no-session", "--no-tools", "--offline"]),
     );
@@ -293,7 +293,7 @@ describe("piAdapter", () => {
   });
 
   it("omits the model flag when no model is given", () => {
-    const invocation = piAdapter.buildInvocation(inPromptRequest, undefined);
+    const invocation = piAdapter.buildInvocation(inPromptRequest, {});
     expect(invocation.args).not.toContain("--model");
     expect(invocation.args).not.toContain("--json-schema");
   });
@@ -386,5 +386,17 @@ describe("apiErrorMessage", () => {
     expect(apiErrorMessage("You've hit your usage limit.")).toBe("You've hit your usage limit.");
     expect(apiErrorMessage('{"detail":"sample"}')).toBe('{"detail":"sample"}');
     expect(apiErrorMessage("null")).toBe("null");
+  });
+});
+
+describe("effort", () => {
+  it.each([
+    ["Claude Code", claudeCodeAdapter, ["--effort", "low"]],
+    ["Codex", codexAdapter, ["-c", "model_reasoning_effort=low"]],
+    ["Pi", piAdapter, ["--thinking", "low"]],
+  ] as const)("passes %s its own effort setting, and none when not given", (_name, adapter, expected) => {
+    const args = adapter.buildInvocation(inPromptRequest, { effort: "low" }).args;
+    expect(args.join(" ")).toContain(expected.join(" "));
+    expect(adapter.buildInvocation(inPromptRequest, {}).args).not.toContain(expected[0]);
   });
 });

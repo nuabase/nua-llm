@@ -209,10 +209,20 @@ const agents = await detectLocalAgents();
 | `agent` | `'claude-code' \| 'codex' \| 'pi'` | Required for `localAgent()` | Which CLI agent to run. |
 | `binaryPath` | `string` | Looked up on `PATH` | Path to executable (`localAgent` only). On Windows, point to a native executable (`.cmd` shims are not supported). |
 | `model` | `string` | Agent's default | The agent's own model name for calls that name no model. Claude Code accepts aliases (`'haiku'`, `'sonnet'`, `'opus'`), and so does a per-call `model: { alias }`. Codex and Pi have no aliases: Codex uses its own model names; Pi uses `'provider/id'` (e.g., `'openrouter/z-ai/glm-5.3-flash'`). |
+| `effort` | `'low' \| 'medium' \| 'high'` | Agent's default | How hard the model thinks, as the CLI's own setting: Claude Code `--effort`, Codex `model_reasoning_effort`, Pi `--thinking`. |
 | `timeoutMs` | `number` | `180000` | Maximum execution time per call in milliseconds. |
 | `concurrency` | `number` | `2` | Maximum concurrent agent processes. |
 | `auth` | `'subscription' \| 'inherit'` | `'subscription'` | `'subscription'` strips env vars like `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` so calls bill your logged-in plan instead of API keys. |
 | `logger` | object | `console` | Object with `debug`, `info`, `warn`, and `error` methods for call and retry logs. |
+
+`agent.with({ model, effort, timeoutMs })` returns the same agent with other call options. It shares the agent's executable, environment, logger and `concurrency` limit, so one `localAgent()` per CLI can serve casts on several of its models without running more processes at once than the limit allows. Options left out keep the agent's; a `model` or `effort` given as `undefined` is the CLI's default.
+
+```ts
+const codex = localAgent({ agent: 'codex', concurrency: 2 });
+const quick = Nua.direct({ localAgent: codex.with({ model: 'gpt-5.6-terra', effort: 'low' }) });
+const careful = Nua.direct({ localAgent: codex.with({ model: 'gpt-5.6-sol', timeoutMs: 300_000 }) });
+// Both run on the same two processes at most.
+```
 
 > **Note:** Local agent calls count against your personal subscription limits. Check each vendor's terms before exposing local-agent execution to end users.
 
