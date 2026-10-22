@@ -3,17 +3,20 @@ import commonjs from '@rollup/plugin-commonjs';
 import json from '@rollup/plugin-json';
 import { nodeResolve } from '@rollup/plugin-node-resolve';
 import replace from '@rollup/plugin-replace';
+import { dts } from 'rollup-plugin-dts';
 import esbuild from 'rollup-plugin-esbuild';
 import nodeExternals from 'rollup-plugin-node-externals';
 
-export default {
-  // Two entry points: "nuabase", which must load in edge runtimes (such as
-  // Cloudflare Workers or Vercel Edge), and the Node-only "nuabase/local-agent",
-  // which runs coding-agent CLIs. Code both use goes into shared chunks.
-  input: {
-    index: path.join(process.cwd(), './src/index.ts'),
-    'local-agent': path.join(process.cwd(), './src/local-agent.ts'),
-  },
+// Two entry points: "nuabase", which must load in edge runtimes (such as
+// Cloudflare Workers or Vercel Edge), and the Node-only "nuabase/local-agent",
+// which runs coding-agent CLIs. Code both use goes into shared chunks.
+const input = {
+  index: path.join(process.cwd(), './src/index.ts'),
+  'local-agent': path.join(process.cwd(), './src/local-agent.ts'),
+};
+
+const js = {
+  input,
   output: [
     {
       format: 'es',
@@ -73,3 +76,14 @@ export default {
     replace({ preventAssignment: true }),
   ],
 };
+
+// One self-contained declaration file per entry and format, nua-llm-core
+// inlined, from the same entry points as the JavaScript above.
+const types = (ext) => ({
+  input,
+  output: { dir: './dist', entryFileNames: `[name].d.${ext}`, chunkFileNames: `chunks/[name]-[hash].d.${ext}` },
+  plugins: [dts({ tsconfig: 'tsconfig.build.json', respectExternal: true })],
+  external: ['zod'],
+});
+
+export default [js, types('mts'), types('cts')];

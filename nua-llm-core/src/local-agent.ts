@@ -9,6 +9,7 @@ export type {
   LocalAgentOptions,
 } from "./modules/engine/local-agent/create-local-agent";
 export type { LocalAgent } from "./modules/engine/local-agent/local-agent";
+export type { Logger } from "./lib/logger";
 export { detectLocalAgents } from "./modules/engine/local-agent/detect";
 export type { LocalAgentStatus } from "./modules/engine/local-agent/detect";
 export { LOCAL_AGENT_IDS, isLocalAgentId } from "./modules/engine/local-agent/agent-id";

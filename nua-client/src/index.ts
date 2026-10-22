@@ -11,7 +11,13 @@ export type {
 
 // Result types
 export type { CastResult, NormalizedUsage, DirectMeta, CastResultSource } from './types';
-export type { AnswerOrigin, LocalAgentId, ModelInput, SchemaEnforcementKind } from 'nua-llm-core';
+export type {
+  AnswerOrigin,
+  LlmProviderId,
+  LocalAgentId,
+  ModelInput,
+  SchemaEnforcementKind,
+} from 'nua-llm-core';
 
 // Re-export zod for convenience
 export { z } from 'zod';

@@ -1,19 +1,17 @@
 {
   "compilerOptions": {
     "target": "es2021",
-    "module": "commonjs",
+    "module": "ESNext",
     "lib": ["ES2021"],
     "moduleDetection": "force",
     "isolatedModules": true,
-    "moduleResolution": "node",
+    "moduleResolution": "Bundler",
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "strict": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
-    "declaration": true,
-    "rootDir": "./src",
-    "outDir": "./dist"
+    "rootDir": "./src"
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "**/*.spec.ts", "**/*.test.ts", "**/__tests__/**"]

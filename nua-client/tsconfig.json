@@ -1,10 +1,10 @@
 {
   "include": ["src", "scripts"],
   "compilerOptions": {
-    "target": "ES2015",
+    "target": "ES2021",
     "lib": ["ESNext"],
     "module": "ESNext",
-    "moduleResolution": "Node",
+    "moduleResolution": "Bundler",
     "skipLibCheck": true,
     "outDir": "temp",
     "declaration": true,

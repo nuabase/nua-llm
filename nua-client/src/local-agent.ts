@@ -24,6 +24,7 @@ export type {
   LocalAgentId,
   LocalAgentOptions,
   LocalAgentStatus,
+  Logger,
   SessionApproval,
   SessionLauncherTarget,
 } from 'nua-llm-core/local-agent';

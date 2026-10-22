@@ -18,15 +18,9 @@ async function packCheck() {
     process.exit(1);
   }
 
-  const testFiles = files
-    .filter((file) => file.path.startsWith('dist/types/__tests__/'))
-    .map((file) => file.path);
-
-  if (testFiles.length > 0) {
-    signale.error('The packed package contains test declarations:');
-    testFiles.forEach((file) => signale.log(file));
-    process.exit(1);
-  }
+  // Every entry point resolves, with the right module format, for node10,
+  // node16 from CJS and from ESM, and bundler consumers.
+  await $`attw --pack .`;
 }
 
 packCheck();
