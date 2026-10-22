@@ -35,12 +35,26 @@ export type CastSuccess<T> = {
 
 export type CastFailure = {
   success: false;
+  /** What went wrong, as one sentence for a log: the attempts made and why the last one failed. */
   error: string;
+  /**
+   * Why the last attempt failed, in the engine's own words where it gave any (a
+   * coding agent's or provider's message), naming neither the engine nor the
+   * attempts. Without an attempt, why none was made.
+   */
+  reason: string;
+  /** Attempts made; 0 when the request was refused before any. */
+  attempts: number;
   /** The prompt of the last attempt, when one was made. */
   prompt?: RenderedPrompt;
 };
 
 export type CastResult<T> = CastSuccess<T> | CastFailure;
+
+/** A cast refused before any attempt, such as for an invalid request. */
+export function refusedCast(reason: string): CastFailure {
+  return { success: false, error: reason, reason, attempts: 0 };
+}
 
 /** Wait before each retry. There is one more attempt than there are delays. */
 const RETRY_DELAYS_MS = [1000, 2000];
@@ -65,7 +79,7 @@ export async function runCast<T>(
   try {
     validate = buildNuaJsonSchemaValueValidation(request.schema);
   } catch (error) {
-    return { success: false, error: `Invalid output schema: ${errorMessage(error)}` };
+    return refusedCast(`Invalid output schema: ${errorMessage(error)}`);
   }
 
   let plan = planAttempt(request, chooseEnforcement(engine, request.schema));
@@ -91,7 +105,7 @@ export async function runCast<T>(
       };
     }
     if (verdict.kind === "give-up") {
-      return { success: false, error: verdict.error, prompt: plan.prompt };
+      return { success: false, error: verdict.error, reason: verdict.error, attempts: attempt, prompt: plan.prompt };
     }
 
     lastFailure = { error: verdict.error, prompt: plan.prompt };
@@ -114,6 +128,8 @@ export async function runCast<T>(
   return {
     success: false,
     error: `LLM call failed after ${MAX_ATTEMPTS} attempts. Last error: ${lastFailure.error}`,
+    reason: lastFailure.error,
+    attempts: MAX_ATTEMPTS,
     prompt: lastFailure.prompt,
   };
 }

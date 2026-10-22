@@ -22,12 +22,12 @@ const FATAL_PATTERNS = [
   /model .* (does not exist|not found|not available)/i,
 ];
 
-export function classifyAgentFailure(agent: string, message: string): AttemptFailure {
-  const full = `${agent}: ${message}`;
+/** `message` is the CLI's own, or says what it did; neither names the CLI. */
+export function classifyAgentFailure(message: string): AttemptFailure {
   if (FATAL_PATTERNS.some((pattern) => pattern.test(message))) {
-    return { kind: "fatal", message: full };
+    return { kind: "fatal", message };
   }
-  return { kind: "transient", message: full };
+  return { kind: "transient", message };
 }
 
 export function stderrTail(result: AgentProcessResult, maxChars = 2000): string {

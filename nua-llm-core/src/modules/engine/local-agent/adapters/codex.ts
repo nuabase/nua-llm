@@ -61,14 +61,17 @@ export const codexAdapter: AgentAdapter = {
 
     const failed = events.find((e) => e.type === "turn.failed" || e.type === "error");
     if (failed) {
-      const message = failed.error?.message ?? failed.message ?? "unknown error";
-      if (/invalid_json_schema/.test(message)) {
+      const raw = failed.error?.message ?? failed.message ?? "unknown error";
+      const message = apiErrorMessage(raw);
+      // The kind is read from the whole error: its code and status say as
+      // much as its message.
+      if (/invalid_json_schema/.test(raw)) {
         return {
           kind: "failed",
-          failure: { kind: "schema-rejected", message: `codex rejected the output schema: ${message}` },
+          failure: { kind: "schema-rejected", message: `rejected the output schema: ${message}` },
         };
       }
-      return { kind: "failed", failure: classifyAgentFailure("codex", message) };
+      return { kind: "failed", failure: { ...classifyAgentFailure(raw), message } };
     }
 
     const agentMessages = events.filter((e) => e.item?.type === "agent_message");
@@ -79,7 +82,6 @@ export const codexAdapter: AgentAdapter = {
       return {
         kind: "failed",
         failure: classifyAgentFailure(
-          "codex",
           `exited with code ${result.exitCode} without a reply: ${stderrTail(result)}`,
         ),
       };
@@ -112,7 +114,7 @@ export const codexAdapter: AgentAdapter = {
     } catch {
       return {
         kind: "failed",
-        failure: { kind: "transient", message: `codex reply is not JSON: ${lastMessage}` },
+        failure: { kind: "transient", message: `reply is not JSON: ${lastMessage}` },
       };
     }
     return { kind: "answered", answer: { kind: "structured", envelope }, ...reported };
@@ -146,4 +148,18 @@ function parseEvents(stdout: string): CodexEvent[] {
     }
   }
   return events;
+}
+
+/**
+ * Pure: the API's own message, when Codex passes on the API's JSON error
+ * (`{"error":{"message":"..."}}`) as its message; otherwise the message.
+ */
+export function apiErrorMessage(message: string): string {
+  try {
+    const inner = (JSON.parse(message) as { error?: { message?: unknown } } | null)?.error?.message;
+    if (typeof inner === "string") return inner;
+  } catch {
+    // Not JSON: Codex's own message.
+  }
+  return message;
 }

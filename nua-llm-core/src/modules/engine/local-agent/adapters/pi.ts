@@ -126,18 +126,17 @@ export const piAdapter: AgentAdapter = {
       .pop();
 
     if (assistant && (assistant.stopReason === "error" || assistant.errorMessage)) {
-      return failed(classifyAgentFailure("pi", assistant.errorMessage ?? "pi stopped with an error"));
+      return failed(classifyAgentFailure(assistant.errorMessage ?? "stopped with an error"));
     }
 
     const retryFailed = events.find((event) => event.type === "auto_retry_end" && event.success === false);
     if (retryFailed) {
-      return failed(classifyAgentFailure("pi", retryFailed.finalError ?? "auto retry failed"));
+      return failed(classifyAgentFailure(retryFailed.finalError ?? "auto retry failed"));
     }
 
     if (!assistant) {
       return failed(
         classifyAgentFailure(
-          "pi",
           `exited with code ${result.exitCode} without a reply: ${stderrTail(result)}`,
         ),
       );
@@ -172,7 +171,7 @@ export const piAdapter: AgentAdapter = {
     try {
       envelope = JSON.parse(text);
     } catch {
-      return failed({ kind: "transient", message: `pi reply is not JSON: ${text}` });
+      return failed({ kind: "transient", message: `reply is not JSON: ${text}` });
     }
     return { kind: "answered", answer: { kind: "structured", envelope }, ...reported };
   },

@@ -197,7 +197,13 @@ describe("runCast", () => {
   it("gives up on the first fatal failure", async () => {
     const engine = scriptedEngine([failed("fatal", "not logged in")]);
     const result = await cast(engine);
-    expect(result).toEqual({ success: false, error: "not logged in", prompt: inPromptPrompt });
+    expect(result).toEqual({
+      success: false,
+      error: "not logged in",
+      reason: "not logged in",
+      attempts: 1,
+      prompt: inPromptPrompt,
+    });
     expect(engine.requests).toHaveLength(1);
   });
 
@@ -215,6 +221,8 @@ describe("runCast", () => {
     if (!result.success) {
       expect(result.error).toMatch(/failed after 3 attempts/);
       expect(result.error).toMatch(/Validation failed/);
+      expect(result.reason).toMatch(/^Validation failed/);
+      expect(result.attempts).toBe(3);
     }
   });
 
@@ -238,7 +246,12 @@ describe("runCast", () => {
   it("fails without calling the engine when the schema does not compile", async () => {
     const engine = scriptedEngine([]);
     const result = await runCast(engine, { ...request, schema: { type: "not-a-type" } }, silentLogger);
-    expect(result).toEqual({ success: false, error: expect.stringMatching(/Invalid output schema/) });
+    expect(result).toEqual({
+      success: false,
+      error: expect.stringMatching(/Invalid output schema/),
+      reason: expect.stringMatching(/Invalid output schema/),
+      attempts: 0,
+    });
     expect(engine.requests).toHaveLength(0);
   });
 });

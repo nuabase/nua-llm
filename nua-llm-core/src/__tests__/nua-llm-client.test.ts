@@ -104,6 +104,11 @@ describe("NuaLlmClient", () => {
       output: { name: "n", schema: { type: "number" } },
     });
 
-    expect(result).toEqual({ success: false, error: "no codex equivalent" });
+    expect(result).toEqual({
+      success: false,
+      error: "no codex equivalent",
+      reason: "no codex equivalent",
+      attempts: 0,
+    });
   });
 });

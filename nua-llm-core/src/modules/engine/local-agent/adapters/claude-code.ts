@@ -70,7 +70,6 @@ export const claudeCodeAdapter: AgentAdapter = {
       return {
         kind: "failed",
         failure: classifyAgentFailure(
-          "claude",
           `exited with code ${result.exitCode} without a JSON result: ${stderrTail(result)}`,
         ),
       };
@@ -81,13 +80,13 @@ export const claudeCodeAdapter: AgentAdapter = {
       if (json.api_error_status === 400 && /input_schema|json.?schema/i.test(message)) {
         return {
           kind: "failed",
-          failure: { kind: "schema-rejected", message: `claude rejected the output schema: ${message}` },
+          failure: { kind: "schema-rejected", message: `rejected the output schema: ${message}` },
         };
       }
       if (json.api_error_status === 401 || json.api_error_status === 403 || json.api_error_status === 429) {
-        return { kind: "failed", failure: { kind: "fatal", message: `claude: ${message}` } };
+        return { kind: "failed", failure: { kind: "fatal", message } };
       }
-      return { kind: "failed", failure: classifyAgentFailure("claude", message) };
+      return { kind: "failed", failure: classifyAgentFailure(message) };
     }
 
     if (json.subtype !== "success") {
@@ -95,7 +94,7 @@ export const claudeCodeAdapter: AgentAdapter = {
         kind: "failed",
         failure: {
           kind: "transient",
-          message: `claude did not finish successfully (${json.subtype ?? "no subtype"})`,
+          message: `did not finish successfully (${json.subtype ?? "no subtype"})`,
         },
       };
     }
@@ -129,7 +128,7 @@ export const claudeCodeAdapter: AgentAdapter = {
         kind: "failed",
         failure: {
           kind: "transient",
-          message: `claude returned no structured output. Reply: ${json.result ?? ""}`,
+          message: `returned no structured output. Reply: ${json.result ?? ""}`,
         },
       };
     }

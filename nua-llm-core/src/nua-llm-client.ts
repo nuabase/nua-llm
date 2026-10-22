@@ -3,7 +3,7 @@ import { JsonSchema } from "./lib/schema-utils";
 import { validateMappableInputData } from "./lib/validate-mappable-input-data";
 import { CastRequest } from "./modules/cast/cast-request";
 import { ListSchema } from "./modules/cast/list-schema";
-import { CastResult, runCast } from "./modules/cast/run-cast";
+import { CastResult, refusedCast, runCast } from "./modules/cast/run-cast";
 import { EngineRouter } from "./modules/engine/engine-router";
 import { ModelInput } from "./modules/model-info";
 
@@ -35,7 +35,7 @@ export class NuaLlmClient {
   async castValue<T = unknown>(params: CastValueParams): Promise<CastResult<T>> {
     const route = this.engines.route(params.model);
     if (route.kind === "unroutable") {
-      return { success: false, error: route.message };
+      return refusedCast(route.message);
     }
 
     const request: CastRequest = {
@@ -53,12 +53,12 @@ export class NuaLlmClient {
     const { primaryKey, outputName, jsonSchema } = params.output;
     const rows = validateMappableInputData(params.input.data, primaryKey);
     if (isNuaValidationError(rows)) {
-      return { success: false, error: rows.message };
+      return refusedCast(rows.message);
     }
 
     const route = this.engines.route(params.model);
     if (route.kind === "unroutable") {
-      return { success: false, error: route.message };
+      return refusedCast(route.message);
     }
 
     const request: CastRequest = {

@@ -1,5 +1,5 @@
 import { claudeCodeAdapter } from "../modules/engine/local-agent/adapters/claude-code";
-import { codexAdapter } from "../modules/engine/local-agent/adapters/codex";
+import { apiErrorMessage, codexAdapter } from "../modules/engine/local-agent/adapters/codex";
 import { piAdapter } from "../modules/engine/local-agent/adapters/pi";
 import { AgentProcessResult } from "../modules/engine/local-agent/adapters/types";
 import { AttemptRequest } from "../modules/engine/llm-engine";
@@ -217,12 +217,25 @@ describe("codexAdapter", () => {
     expect(reply).toMatchObject({ kind: "failed", failure: { kind: "schema-rejected" } });
   });
 
-  it("treats a model the ChatGPT plan does not offer as fatal", () => {
+  it("treats a model the ChatGPT plan does not offer as fatal, in the API's own words", () => {
     const message =
       '{"type":"error","status":400,"error":{"type":"invalid_request_error","message":"The \'gpt-sample-050505\' model is not supported when using Codex with a ChatGPT account."}}';
     const events = [{ type: "turn.failed", error: { message } }];
     const reply = codexAdapter.readResult(processResult({ exitCode: 1, stdout: jsonl(events) }), nativeRequest);
-    expect(reply).toMatchObject({ kind: "failed", failure: { kind: "fatal" } });
+    expect(reply).toEqual({
+      kind: "failed",
+      failure: {
+        kind: "fatal",
+        message: "The 'gpt-sample-050505' model is not supported when using Codex with a ChatGPT account.",
+      },
+    });
+  });
+
+  it("tells a fatal failure by the API's status, around its message", () => {
+    const message = '{"type":"error","status":429,"error":{"type":"sample_error","message":"Slow down."}}';
+    const events = [{ type: "turn.failed", error: { message } }];
+    const reply = codexAdapter.readResult(processResult({ exitCode: 1, stdout: jsonl(events) }), nativeRequest);
+    expect(reply).toEqual({ kind: "failed", failure: { kind: "fatal", message: "Slow down." } });
   });
 
   it("ignores item-level warnings", () => {
@@ -359,5 +372,19 @@ describe("piAdapter", () => {
     expect(piAdapter.loginStatusArgs).toEqual(["--version"]);
     expect(piAdapter.readLoginStatus(processResult({ stdout: "0.87.1" })).loggedIn).toBe(true);
     expect(piAdapter.readLoginStatus(processResult({ exitCode: 1 })).loggedIn).toBe(false);
+  });
+});
+
+describe("apiErrorMessage", () => {
+  it("takes the API's message out of the JSON error Codex passes on", () => {
+    expect(apiErrorMessage('{"type":"error","error":{"type":"invalid_request_error","message":"sample refusal"}}')).toBe(
+      "sample refusal",
+    );
+  });
+
+  it("keeps any other message as it is", () => {
+    expect(apiErrorMessage("You've hit your usage limit.")).toBe("You've hit your usage limit.");
+    expect(apiErrorMessage('{"detail":"sample"}')).toBe('{"detail":"sample"}');
+    expect(apiErrorMessage("null")).toBe("null");
   });
 });

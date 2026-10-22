@@ -149,7 +149,8 @@ function enginesFor(config: DirectConfig): EngineRouter {
 
 function toDirectResult<T>(result: CoreCastResult<T>, latencyMs: number): CastResult<T> {
   if (!result.success) {
-    return { success: false, error: result.error, source: 'direct', latencyMs };
+    const { error, reason, attempts } = result;
+    return { success: false, error, reason, attempts, source: 'direct', latencyMs };
   }
   return {
     success: true,

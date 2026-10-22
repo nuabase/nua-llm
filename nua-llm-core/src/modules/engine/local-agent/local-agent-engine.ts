@@ -71,7 +71,7 @@ export class LocalAgentEngine implements LlmEngine {
     }
 
     if (result.timedOut) {
-      return failed({ kind: "fatal", message: `${adapter.id} did not finish within ${timeoutMs}ms` });
+      return failed({ kind: "fatal", message: `did not finish within ${timeoutMs}ms` });
     }
 
     const reply = adapter.readResult(result, request);
