@@ -92,13 +92,12 @@ export class Nua {
 
     const outputSchema = options?.output?.schema ?? z.string();
     const outputName = options?.output?.name ?? 'result';
-    const jsonSchema = z.toJSONSchema(outputSchema);
 
     const startTime = Date.now();
     const result = await this.client.castValue({
       model: options?.model,
       input: { prompt, data: options?.input ?? null },
-      output: { name: outputName, schema: jsonSchema },
+      output: { name: outputName, schema: outputSchema },
     });
     return toDirectResult(result, Date.now() - startTime);
   }
@@ -125,7 +124,7 @@ export class Nua {
       throw new TypeError('primaryKey must be a non-empty string');
     }
 
-    const output = listSchema(z.toJSONSchema(options.output.schema), {
+    const output = listSchema(options.output.schema, {
       primaryKey: options.primaryKey,
       outputName: options.output.name,
     });

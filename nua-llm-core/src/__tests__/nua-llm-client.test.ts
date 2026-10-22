@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { Logger } from "../lib/logger";
 import { listSchema } from "../modules/cast/list-schema";
 import { EngineRouter, Route } from "../modules/engine/engine-router";
@@ -52,7 +53,7 @@ describe("NuaLlmClient", () => {
     const result = await client.castValue({
       model: { alias: "haiku" },
       input: { prompt: "How many days are in a week?" },
-      output: { name: "days", schema: { type: "number" } },
+      output: { name: "days", schema: z.number() },
     });
 
     expect(router.asked).toEqual([{ alias: "haiku" }]);
@@ -73,7 +74,7 @@ describe("NuaLlmClient", () => {
 
     const result = await client.castArray({
       input: { prompt: "Pick the account", data: [{ id: 1, text: "NOPII RESTAURANT sample" }] },
-      output: listSchema({ type: "string" }, { primaryKey: "id", outputName: "account" }),
+      output: listSchema(z.string(), { primaryKey: "id", outputName: "account" }),
     });
 
     expect(result).toMatchObject({ success: true, data: rows });
@@ -89,10 +90,20 @@ describe("NuaLlmClient", () => {
 
     const result = await client.castArray({
       input: { prompt: "p", data: [{ key: 1, text: "sample" }] },
-      output: listSchema({ type: "string" }, { primaryKey: "id", outputName: "account" }),
+      output: listSchema(z.string(), { primaryKey: "id", outputName: "account" }),
     });
 
     expect(result).toMatchObject({ success: false, error: expect.stringMatching(/primary key 'id'/) });
+    expect(router.asked).toEqual([]);
+  });
+
+  it("throws for a schema that JSON schema cannot describe, before routing", async () => {
+    const router = fixedRouter({ kind: "unroutable", message: "not asked" });
+    const client = new NuaLlmClient(router);
+
+    await expect(
+      client.castValue({ input: { prompt: "p" }, output: { name: "when", schema: z.date() } }),
+    ).rejects.toThrow(/cannot be represented in JSON Schema/);
     expect(router.asked).toEqual([]);
   });
 
@@ -101,7 +112,7 @@ describe("NuaLlmClient", () => {
 
     const result = await client.castValue({
       input: { prompt: "p" },
-      output: { name: "n", schema: { type: "number" } },
+      output: { name: "n", schema: z.number() },
     });
 
     expect(result).toEqual({

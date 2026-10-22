@@ -1,4 +1,4 @@
-import { JsonSchema } from "../../lib/schema-utils";
+import { z } from "zod";
 
 declare const listSchemaBrand: unique symbol;
 
@@ -17,8 +17,8 @@ export type ListRowKeys = {
  */
 export type ListSchema = ListRowKeys & {
   readonly [listSchemaBrand]: true;
-  /** The JSON schema of the whole list, as sent to the model and validated against. */
-  jsonSchema: JsonSchema;
+  /** The schema of the whole list, as described to the model and validated against. */
+  schema: z.ZodType;
 };
 
 /**
@@ -26,28 +26,16 @@ export type ListSchema = ListRowKeys & {
  *
  *   array<{ <primaryKey>: string | number, <outputName>: <itemSchema> }>
  */
-export function listSchema(itemSchema: JsonSchema, keys: ListRowKeys): ListSchema {
-  const jsonSchema: JsonSchema = {
-    type: "array",
-    items: {
-      type: "object",
-      required: [keys.primaryKey, keys.outputName],
-      properties: {
-        [keys.primaryKey]: {
-          anyOf: [{ type: "string" }, { type: "number" }, { type: "integer" }],
-        },
-        [keys.outputName]: itemSchema,
-      },
-    },
-  };
-
-  if (typeof itemSchema.$schema === "string") {
-    jsonSchema.$schema = itemSchema.$schema;
-  }
-
-  return brand(keys, jsonSchema);
+export function listSchema(itemSchema: z.ZodType, keys: ListRowKeys): ListSchema {
+  const schema = z.array(
+    z.object({
+      [keys.primaryKey]: z.union([z.string(), z.number()]),
+      [keys.outputName]: itemSchema,
+    }),
+  );
+  return brand(keys, schema);
 }
 
-function brand(keys: ListRowKeys, jsonSchema: JsonSchema): ListSchema {
-  return { primaryKey: keys.primaryKey, outputName: keys.outputName, jsonSchema } as ListSchema;
+function brand(keys: ListRowKeys, schema: z.ZodType): ListSchema {
+  return { primaryKey: keys.primaryKey, outputName: keys.outputName, schema } as ListSchema;
 }

@@ -16,16 +16,14 @@ const SYSTEM_PROMPTS: Record<SchemaEnforcementKind, string> = {
     ...DESCRIBE_OUTPUT,
     `Your entire response should be just the value of '${templateVarName("OUTPUT_TYPE_NAME")}', as valid JSON.`,
     `And it should not be wrapped in any wrapper object -- return exactly what the JSON schema is expecting.`,
-    `We will validate the result with the AJV Node library, using ajv.parse, against the given schema, and we expect`,
-    `it to validate correctly.`,
+    `We will validate the result against the given schema, and we expect it to validate correctly.`,
     `IMPORTANT: Output raw JSON only. No markdown code fences, no explanation, no commentary, no extra fields beyond the schema. Do not correct yourself -- produce the right answer on the first try.`,
   ].join(" "),
   native: [
     ...DESCRIBE_OUTPUT,
     `Your reply is enforced by a JSON schema that wraps the result in an object:`,
     `put the value of '${templateVarName("OUTPUT_TYPE_NAME")}' in its "${ENVELOPE_KEY}" field.`,
-    `We will validate the "${ENVELOPE_KEY}" field with the AJV Node library against the schema below, and we expect`,
-    `it to validate correctly.`,
+    `We will validate the "${ENVELOPE_KEY}" field against the schema below, and we expect it to validate correctly.`,
   ].join(" "),
 };
 
@@ -34,7 +32,7 @@ export function renderValuePrompt(cast: ValueCastRequest, enforcement: SchemaEnf
   const reusable = [
     cast.prompt || "Transform the provided data according to the schema.",
     system,
-    `<json-schema-spec> ${JSON.stringify(cast.schema)} </json-schema-spec>`,
+    `<json-schema-spec> ${JSON.stringify(cast.jsonSchema)} </json-schema-spec>`,
   ];
   const full = [...reusable, cast.data ? `<input-data>${JSON.stringify(cast.data)}</input-data>` : ""].join("\n");
   return { system, full, reusablePrefix: reusable.join("\n") };

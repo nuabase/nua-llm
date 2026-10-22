@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { JsonSchema } from "../../lib/schema-utils";
 import { MappableInputData } from "../../lib/types";
 
@@ -12,7 +13,9 @@ export type ValueCastRequest = {
   data: unknown;
   outputName: string;
   /** The schema the result must satisfy. */
-  schema: JsonSchema;
+  schema: z.ZodType;
+  /** `schema` as JSON schema, to describe it to the model (see describeSchema). */
+  jsonSchema: JsonSchema;
   maxTokens: number;
 };
 
@@ -25,7 +28,9 @@ export type ListCastRequest = {
   primaryKey: string;
   outputName: string;
   /** The schema the whole list must satisfy (see list-schema). */
-  schema: JsonSchema;
+  schema: z.ZodType;
+  /** `schema` as JSON schema, to describe it to the model (see describeSchema). */
+  jsonSchema: JsonSchema;
   maxTokens: number;
 };
 

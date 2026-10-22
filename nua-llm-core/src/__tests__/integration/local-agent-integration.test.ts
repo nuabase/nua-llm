@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { ConsoleLogger } from "../../lib/logger";
 import { listSchema } from "../../modules/cast/list-schema";
 import { isLocalAgentId, LocalAgentId } from "../../modules/engine/local-agent/agent-id";
@@ -57,7 +58,7 @@ describe.each(agents.length > 0 ? agents : ["none" as const])("local agent %s", 
         ],
       },
       output: listSchema(
-        { type: "string", enum: ["Expenses:Food", "Expenses:Travel", "Income:Salary"] },
+        z.enum(["Expenses:Food", "Expenses:Travel", "Income:Salary"]),
         { primaryKey: "id", outputName: "account" },
       ),
     });
@@ -73,7 +74,7 @@ describe.each(agents.length > 0 ? agents : ["none" as const])("local agent %s", 
   it("casts a single scalar value", async () => {
     const result = await client.castValue<number>({
       input: { prompt: "How many days are in a week?" },
-      output: { name: "days", schema: { type: "number" } },
+      output: { name: "days", schema: z.number() },
     });
     if (!result.success) throw new Error(result.error);
     expect(result.data).toBe(7);
@@ -84,11 +85,7 @@ describe.each(agents.length > 0 ? agents : ["none" as const])("local agent %s", 
       input: { prompt: "Which city is the capital of France? Omit nickname." },
       output: {
         name: "capital",
-        schema: {
-          type: "object",
-          properties: { city: { type: "string" }, nickname: { type: "string" } },
-          required: ["city"],
-        },
+        schema: z.object({ city: z.string(), nickname: z.string().optional() }),
       },
     });
     if (!result.success) throw new Error(result.error);

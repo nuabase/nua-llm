@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { Logger } from "../../lib/logger";
 import { JsonSchema } from "../../lib/schema-utils";
 import { NormalizedUsage } from "../engine/http/provider-config";
@@ -14,10 +15,6 @@ import {
   extractThinkingFromResponse,
   parseJsonFromLlmResponse,
 } from "../execution/llm-response-extraction";
-import {
-  buildNuaJsonSchemaValueValidation,
-  ValidationResult,
-} from "../json-schema-validation/nua-json-schema-value-validation";
 import { CastRequest, RenderedPrompt } from "./cast-request";
 import { ENVELOPE_KEY, unwrapEnvelope, wrapInEnvelope } from "./envelope";
 import { renderPrompt } from "./prompts/render-prompt";
@@ -75,14 +72,8 @@ export async function runCast<T>(
   request: CastRequest,
   logger: Logger,
 ): Promise<CastResult<T>> {
-  let validate: (data: object) => ValidationResult;
-  try {
-    validate = buildNuaJsonSchemaValueValidation(request.schema);
-  } catch (error) {
-    return refusedCast(`Invalid output schema: ${errorMessage(error)}`);
-  }
-
-  let plan = planAttempt(request, chooseEnforcement(engine, request.schema));
+  const validate = validatorFor(request.schema);
+  let plan = planAttempt(request, chooseEnforcement(engine, request.jsonSchema));
   let lastFailure = { error: "", prompt: plan.prompt };
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
@@ -143,6 +134,18 @@ function planAttempt(request: CastRequest, enforcement: SchemaEnforcement): Atte
   return { enforcement, prompt: renderPrompt(request, enforcement.kind) };
 }
 
+/** An answer checked against the cast's schema: its parsed value, or why it does not fit. */
+export type ValidationResult = { success: true; data: unknown } | { success: false; error: string };
+
+function validatorFor(schema: z.ZodType): (value: unknown) => ValidationResult {
+  return (value) => {
+    const parsed = schema.safeParse(value);
+    return parsed.success
+      ? { success: true, data: parsed.data }
+      : { success: false, error: z.prettifyError(parsed.error) };
+  };
+}
+
 export type Verdict =
   | { kind: "accept"; data: unknown; usage: NormalizedUsage; origin: AnswerOrigin }
   | { kind: "retry"; error: string }
@@ -152,7 +155,7 @@ export type Verdict =
 /** Decides what one attempt means for the cast. */
 export function judgeOutcome(
   outcome: AttemptOutcome,
-  validate: (data: object) => ValidationResult,
+  validate: (value: unknown) => ValidationResult,
 ): Verdict {
   if (outcome.kind === "failed") {
     return verdictForFailure(outcome.failure);
@@ -163,15 +166,15 @@ export function judgeOutcome(
     return { kind: "retry", error: candidate.error };
   }
 
-  const validation = validate(candidate.value as object);
+  const validation = validate(candidate.value);
   if (!validation.success) {
     return {
       kind: "retry",
-      error: `Validation failed: ${validation.error || "Unknown validation error"}\n\nRaw LLM response:\n${candidate.raw}`,
+      error: `Validation failed: ${validation.error}\n\nRaw LLM response:\n${candidate.raw}`,
     };
   }
 
-  return { kind: "accept", data: candidate.value, usage: outcome.usage, origin: outcome.origin };
+  return { kind: "accept", data: validation.data, usage: outcome.usage, origin: outcome.origin };
 }
 
 function verdictForFailure(failure: AttemptFailure): Verdict {

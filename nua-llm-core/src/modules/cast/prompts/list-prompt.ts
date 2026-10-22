@@ -22,14 +22,14 @@ const SYSTEM_PROMPTS: Record<SchemaEnforcementKind, string> = {
     `Respond with only the instance, not the schema. It should not be wrapped in any wrapper object -- return exactly what the JSON schema is expecting.`,
     `Your entire response should be just the value of the JSON array containing objects with '${templateVarName("OUTPUT_TYPE_NAME")}'`,
     `and its primary key '${templateVarName("PRIMARY_KEY")}', as valid JSON.`,
-    `We will validate the result with the AJV Node library, using ajv.parse, against the JSON schema, and we expect it to validate correctly.`,
+    `We will validate the result against the JSON schema, and we expect it to validate correctly.`,
     ...MATCH_PRIMARY_KEYS,
   ].join(" "),
   native: [
     ...DESCRIBE_OUTPUT,
     `Respond with only the instance, not the schema. Your reply is enforced by a JSON schema that wraps the result in an object:`,
     `put the JSON array, containing objects with '${templateVarName("OUTPUT_TYPE_NAME")}' and its primary key '${templateVarName("PRIMARY_KEY")}', in its "${ENVELOPE_KEY}" field.`,
-    `We will validate the "${ENVELOPE_KEY}" field with the AJV Node library against the JSON schema, and we expect it to validate correctly.`,
+    `We will validate the "${ENVELOPE_KEY}" field against the JSON schema, and we expect it to validate correctly.`,
     ...MATCH_PRIMARY_KEYS,
   ].join(" "),
 };
@@ -40,7 +40,7 @@ export function renderListPrompt(cast: ListCastRequest, enforcement: SchemaEnfor
   const reusable = [
     cast.prompt || "Transform the provided data according to the schema.",
     system,
-    `<json-schema-spec> ${JSON.stringify(cast.schema)} </json-schema-spec>`,
+    `<json-schema-spec> ${JSON.stringify(cast.jsonSchema)} </json-schema-spec>`,
   ];
   const full = [...reusable, `<input-data>${JSON.stringify(cast.rows)}</input-data>`].join("\n");
   return { system, full, reusablePrefix: reusable.join("\n") };

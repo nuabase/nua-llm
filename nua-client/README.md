@@ -267,7 +267,7 @@ Expected failures come back as `kind: 'refused'`, with nothing written: Windows,
 
 Every `get()` and `list()` call returns a discriminated union (`result.success`). Every failure of the LLM call itself comes back as `success: false`.
 
-The call rejects (throws) only for invalid arguments, before anything is sent: an empty prompt, a non-array `input`, an empty `primaryKey`, or a Zod schema that JSON Schema can't express (such as `.transform()` or `z.date()`).
+The call rejects (throws) only for invalid arguments, before anything is sent: an empty prompt, a non-array `input`, an empty `primaryKey`, or a Zod schema that JSON Schema can't express (such as `z.date()`).
 
 ### Success (`result.success === true`)
 
@@ -308,7 +308,7 @@ The call rejects (throws) only for invalid arguments, before anything is sent: a
 
 ## How It Works Under the Hood
 
-Each `get()` or `list()` call converts your Zod schema to JSON Schema, sends it alongside your prompt and input data, and validates the returned payload against that JSON Schema. Zod checks that JSON Schema can't express, such as `.refine()`, are not applied.
+Each `get()` or `list()` call converts your Zod schema to JSON Schema to tell the model the shape, sends it alongside your prompt and input data, and parses the returned payload with your Zod schema. `data` is Zod's parsed output: `.default()`s are filled in, `.transform()`s run, `.refine()` checks apply, and unknown object keys are dropped. The JSON Schema describes what the schema accepts (its input side), so `.transform()` is fine; checks it can't express, such as `.refine()`, aren't shown to the model, but a payload that fails them is retried like any other invalid output.
 
 Transient errors and outputs that fail validation are **automatically retried up to 2 times**. Fatal errors fail at once: a bad API key, an agent that isn't logged in, an exhausted quota, a timeout, or a model none of your providers serves.
 
@@ -334,7 +334,7 @@ When using `Nua.direct({ localAgent })`, each call spawns the CLI in a fresh, em
 * **Fallback to in-prompt schemas:**
   * **Codex** only accepts OpenAI strict-mode schemas; schemas with optional properties or open-ended objects are injected into the prompt instead.
   * **Pi** has no native schema flag, so schemas are always described in the prompt.
-  * If any agent rejects a native schema flag, Nuabase automatically retries with the schema injected into the prompt. The output is validated against the JSON Schema either way.
+  * If any agent rejects a native schema flag, Nuabase automatically retries with the schema injected into the prompt. The output is parsed with your Zod schema either way.
 
 ---
 

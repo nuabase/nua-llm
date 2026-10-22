@@ -1,30 +1,35 @@
+import { z } from "zod";
+import { describeSchema } from "../lib/schema-utils";
 import { listSchema } from "../modules/cast/list-schema";
 
 const keys = { primaryKey: "id", outputName: "nutrition" };
+const itemSchema = z.object({ calories: z.number() });
 
 describe("listSchema", () => {
   it("makes an array of rows that each hold the primary key and one output value", () => {
-    const itemSchema = { type: "object", properties: { calories: { type: "number" } } };
+    const list = listSchema(itemSchema, keys);
 
-    expect(listSchema(itemSchema, keys)).toEqual({
-      primaryKey: "id",
-      outputName: "nutrition",
-      jsonSchema: {
-        type: "array",
-        items: {
-          type: "object",
-          required: ["id", "nutrition"],
-          properties: {
-            id: { anyOf: [{ type: "string" }, { type: "number" }, { type: "integer" }] },
-            nutrition: itemSchema,
-          },
+    expect(list).toMatchObject({ primaryKey: "id", outputName: "nutrition" });
+    expect(describeSchema(list.schema)).toEqual({
+      $schema: "https://json-schema.org/draft/2020-12/schema",
+      type: "array",
+      items: {
+        type: "object",
+        required: ["id", "nutrition"],
+        properties: {
+          id: { type: ["string", "number"] },
+          nutrition: { type: "object", properties: { calories: { type: "number" } }, required: ["calories"] },
         },
       },
     });
   });
 
-  it("keeps the item schema's $schema at the top", () => {
-    const schema = listSchema({ $schema: "http://json-schema.org/draft-07/schema#", type: "string" }, keys);
-    expect(schema.jsonSchema.$schema).toBe("http://json-schema.org/draft-07/schema#");
+  it("accepts string and number primary keys and rejects rows missing either field", () => {
+    const { schema } = listSchema(itemSchema, keys);
+
+    expect(schema.safeParse([{ id: "a", nutrition: { calories: 1 } }, { id: 2, nutrition: { calories: 3 } }]))
+      .toMatchObject({ success: true });
+    expect(schema.safeParse([{ id: 1 }]).success).toBe(false);
+    expect(schema.safeParse([{ nutrition: { calories: 1 } }]).success).toBe(false);
   });
 });

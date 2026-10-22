@@ -1,5 +1,6 @@
+import { z } from "zod";
 import { Logger } from "../lib/logger";
-import { JsonSchema } from "../lib/schema-utils";
+import { describeSchema, JsonSchema } from "../lib/schema-utils";
 import { unwrapEnvelope, wrapInEnvelope } from "../modules/cast/envelope";
 import { CastRequest } from "../modules/cast/cast-request";
 import { listSchema } from "../modules/cast/list-schema";
@@ -27,7 +28,8 @@ const request: CastRequest = {
   prompt: "How many days are in a week?",
   data: null,
   outputName: "days",
-  schema: { type: "number" },
+  schema: z.number(),
+  jsonSchema: { type: "number" },
   maxTokens: 100,
 };
 const inPromptPrompt = renderPrompt(request, "in-prompt");
@@ -84,19 +86,16 @@ describe("envelope", () => {
     });
   });
 
-  it("drops $schema from a list's item schema", () => {
-    const { jsonSchema } = listSchema(
-      { $schema: "http://json-schema.org/draft-07/schema#", type: "string" },
-      { primaryKey: "id", outputName: "account" },
-    );
-    expect(wrapInEnvelope(jsonSchema).properties).toEqual({
+  it("drops $schema from a list's schema", () => {
+    const { schema } = listSchema(z.string(), { primaryKey: "id", outputName: "account" });
+    expect(wrapInEnvelope(describeSchema(schema)).properties).toEqual({
       value: {
         type: "array",
         items: {
           type: "object",
           required: ["id", "account"],
           properties: {
-            id: { anyOf: [{ type: "string" }, { type: "number" }, { type: "integer" }] },
+            id: { type: ["string", "number"] },
             account: { type: "string" },
           },
         },
@@ -243,15 +242,20 @@ describe("runCast", () => {
     expect(await pending).toMatchObject({ success: true, data: 7 });
   });
 
-  it("fails without calling the engine when the schema does not compile", async () => {
-    const engine = scriptedEngine([]);
-    const result = await runCast(engine, { ...request, schema: { type: "not-a-type" } }, silentLogger);
-    expect(result).toEqual({
+  it("returns the schema's parsed value, with defaults filled in and unknown keys dropped", async () => {
+    const schema = z.object({ city: z.string(), country: z.string().default("France") });
+    const engine = scriptedEngine([text('{"city":"Paris","nickname":"City of Light"}')]);
+    const result = await runCast(engine, { ...request, schema, jsonSchema: describeSchema(schema) }, silentLogger);
+    expect(result).toMatchObject({ success: true, data: { city: "Paris", country: "France" } });
+  });
+
+  it("says why an answer does not fit the schema", async () => {
+    const engine = scriptedEngine([text('"seven"'), text('"seven"'), text('"seven"')]);
+    const pending = cast(engine);
+    await jest.runAllTimersAsync();
+    expect(await pending).toMatchObject({
       success: false,
-      error: expect.stringMatching(/Invalid output schema/),
-      reason: expect.stringMatching(/Invalid output schema/),
-      attempts: 0,
+      reason: expect.stringContaining("expected number, received string"),
     });
-    expect(engine.requests).toHaveLength(0);
   });
 });

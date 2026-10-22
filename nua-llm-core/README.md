@@ -1,6 +1,6 @@
 # Nua LLM Core Library
 
-A standalone, type-safe TypeScript library for performing structured data extraction using LLMs. This library handles prompt construction, model negotiation, and JSON schema validation, providing a clean API for "casting" unstructured data into typed values and arrays.
+A standalone, type-safe TypeScript library for performing structured data extraction using LLMs. This library handles prompt construction, model negotiation, and validation with Zod schemas, providing a clean API for "casting" unstructured data into typed values and arrays.
 
 ## Quick Start
 
@@ -29,6 +29,8 @@ const client = new NuaLlmClient(
 Extract a single structured object from natural language inputs.
 
 ```typescript
+import { z } from "zod";
+
 const result = await client.castValue({
   model: { alias: "fast" }, // optional; omitted model also defaults to fast
   input: {
@@ -37,15 +39,11 @@ const result = await client.castValue({
   },
   output: {
     name: "Event",
-    schema: {
-      type: "object",
-      properties: {
-        title: { type: "string" },
-        date: { type: "string", format: "date" },
-        time: { type: "string" },
-      },
-      required: ["title", "date"],
-    },
+    schema: z.object({
+      title: z.string(),
+      date: z.iso.date(),
+      time: z.string().optional(),
+    }),
   },
 });
 
@@ -63,6 +61,7 @@ Map each input row to one output value, keyed by the row's primary key.
 
 ```typescript
 import { listSchema } from "nua-llm-core";
+import { z } from "zod";
 
 const rows = [
   { id: 1, line: "Apple - $1.20" },
@@ -76,17 +75,10 @@ const result = await client.castArray({
     prompt: "Convert price list to structured objects",
     data: rows,
   },
-  output: listSchema(
-    {
-      type: "object",
-      properties: {
-        name: { type: "string" },
-        price: { type: "number" },
-      },
-      required: ["name", "price"],
-    },
-    { primaryKey: "id", outputName: "product" },
-  ),
+  output: listSchema(z.object({ name: z.string(), price: z.number() }), {
+    primaryKey: "id",
+    outputName: "product",
+  }),
 });
 // result.data: [{ id: 1, product: { name: "Apple", price: 1.2 } }, ...]
 
@@ -135,7 +127,7 @@ Performs a single LLM call to extract an object matching the schema.
 *   `input.prompt`: Instructions for the extraction.
 *   `input.data`: The context data (string or object) to process.
 *   `output.name`: Name of the entity (helps LLM context).
-*   `output.schema`: JSON Schema object defining the structure.
+*   `output.schema`: Zod schema defining the structure. The model is shown it as JSON Schema (its input side, via `z.toJSONSchema`), and its answer is parsed with it, so `data` is the parsed value (defaults filled in, transforms run, unknown keys dropped). Throws for a schema JSON Schema cannot express, such as `z.date()`.
 *   **Returns**: `Promise<CastResult<T>>`, discriminated on `success`:
     *   `success: true`: `data: T`, `usage` (token usage of the successful attempt), `prompt` (`{ system, full, reusablePrefix }`: the prompt that attempt sent, the part of it that describes the output shape, and the start of it that repeats on every call of the cast), `origin` (which engine answered: `{ engine: "http", provider, model }` or `{ engine: "local-agent", agent, model, costUsdEstimate }`), and `schemaEnforcement` (`"in-prompt"` or `"native"`).
     *   `success: false`: `error: string`, and `prompt` when an attempt was made.
@@ -174,5 +166,5 @@ It **does**:
 *   Manage provider-specific configurations.
 *   Construct optimized system prompts (`<json-schema-spec>`, `<input-data>` wrappers).
 *   Parse "Thinking" blocks from advanced models.
-*   Validate outputs using AJV against the provided JSON schema.
+*   Validate outputs with the provided Zod schema, returning its parsed value.
 *   Retry failed attempts, unless retrying cannot help (for example a rejected API key, or an agent that is not logged in).
