@@ -245,8 +245,11 @@ const session = await startAgentSession({
 switch (session.kind) {
   case 'opened': // macOS: a new terminal window is running the agent
     break;
-  case 'command': // elsewhere, or the window didn't open (session.terminalError)
+  case 'command': // elsewhere: the user starts it
     console.log(`Run in a terminal: ${session.files.command}`);
+    break;
+  case 'open_failed': // macOS, but the window didn't open (session.error); the files are written
+    console.log(`Couldn't open a terminal (${session.error}). Run: ${session.files.command}`);
     break;
   case 'refused': // 'unsupported_platform' | 'prompt_too_long' | 'agent_not_found'; nothing written
     console.error(session.message);

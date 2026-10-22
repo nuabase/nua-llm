@@ -148,12 +148,12 @@ describe("startAgentSession", () => {
     expect(open.mock.calls[0].slice(0, 2)).toEqual(["open", [filesOf(started).launcherPath]]);
   });
 
-  it("gives the command, with the files written, when the terminal window doesn't open", async () => {
+  it("says why the terminal window didn't open, with the files written", async () => {
     stubOpen(new Error("sample failure"));
 
     const started = await startAgentSession({ ...config, platform: "darwin" });
 
-    expect(started).toMatchObject({ kind: "command", terminalError: "sample failure" });
+    expect(started).toMatchObject({ kind: "open_failed", error: "sample failure" });
     expect(fs.existsSync(filesOf(started).launcherPath)).toBe(true);
   });
 

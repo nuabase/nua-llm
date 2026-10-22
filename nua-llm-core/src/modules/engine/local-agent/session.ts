@@ -83,10 +83,14 @@ export type AgentSessionStart =
   | { kind: "opened"; files: AgentSessionFiles }
   /**
    * The files are written, and the user starts the session by running
-   * `files.command` in a terminal. `terminalError` says why a terminal window
-   * didn't open, on a platform that opens one.
+   * `files.command` in a terminal: this platform opens no terminal window.
    */
-  | { kind: "command"; files: AgentSessionFiles; terminalError?: string }
+  | { kind: "command"; files: AgentSessionFiles }
+  /**
+   * The files are written, but the terminal window didn't open, for the reason
+   * in `error`; the user can still run `files.command` in a terminal.
+   */
+  | { kind: "open_failed"; files: AgentSessionFiles; error: string }
   | { kind: "refused"; reason: AgentSessionRefusal; message: string };
 
 // Linux caps one command-line argument at 131072 bytes (MAX_ARG_STRLEN), and
@@ -132,7 +136,7 @@ export async function startAgentSession(config: AgentSessionConfig): Promise<Age
   try {
     await promisify(execFile)("open", [files.launcherPath]);
   } catch (error) {
-    return { kind: "command", files, terminalError: error instanceof Error ? error.message : String(error) };
+    return { kind: "open_failed", files, error: error instanceof Error ? error.message : String(error) };
   }
   return { kind: "opened", files };
 }
