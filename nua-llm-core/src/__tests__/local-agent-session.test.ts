@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import * as childProcess from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -9,13 +9,21 @@ import { codexAdapter } from "../modules/engine/local-agent/adapters/codex";
 import { piAdapter } from "../modules/engine/local-agent/adapters/pi";
 import {
   agentSessionMode,
-  fitsAgentSession,
-  openInTerminal,
+  AgentSessionConfig,
+  AgentSessionFiles,
+  AgentSessionStart,
   sessionLauncher,
-  writeAgentSession,
+  startAgentSession,
 } from "../modules/engine/local-agent/session";
 
-const run = promisify(execFile);
+// macOS's `open` would open a real terminal window, so execFile is a mock;
+// it runs the real one unless a test says otherwise.
+jest.mock("node:child_process", () => {
+  const actual = jest.requireActual<typeof childProcess>("node:child_process");
+  return { ...actual, execFile: jest.fn(actual.execFile) };
+});
+const execFileMock = jest.mocked(childProcess.execFile);
+const run = promisify(jest.requireActual<typeof childProcess>("node:child_process").execFile);
 
 const PROMPT = [
   "--settings={} Read `sample notes.md` first.",
@@ -42,15 +50,6 @@ describe("agentSessionMode", () => {
     expect(agentSessionMode("darwin")).toBe("terminal");
     expect(agentSessionMode("linux")).toBe("command");
     expect(agentSessionMode("win32")).toBe("none");
-  });
-});
-
-describe("fitsAgentSession", () => {
-  it("refuses a prompt too long for one argument on Linux only", () => {
-    const long = "x".repeat(131_072);
-    expect(fitsAgentSession(long, "linux")).toBe(false);
-    expect(fitsAgentSession(long.slice(1), "linux")).toBe(true);
-    expect(fitsAgentSession(long, "darwin")).toBe(true);
   });
 });
 
@@ -88,31 +87,46 @@ describe("sessionLauncher", () => {
   });
 });
 
-describe("writeAgentSession", () => {
+/** The files of a session that was started, or a failed test. */
+function filesOf(started: AgentSessionStart): AgentSessionFiles {
+  if (started.kind === "refused") throw new Error(`refused: ${started.message}`);
+  return started.files;
+}
+
+describe("startAgentSession", () => {
   let dir: string;
+  let config: AgentSessionConfig;
 
   beforeEach(() => {
     dir = fs.mkdtempSync(path.join(os.tmpdir(), "nua-session-"));
+    config = { agent: "claude-code", binaryPath: "/sample/bin/claude", cwd: dir, prompt: PROMPT, dir, name: "sample" };
   });
 
   afterEach(() => {
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
-  it("writes the prompt and a launcher only their owner can read", () => {
+  /** Stands in for the next `open`, which succeeds or fails with `error`. */
+  function stubOpen(error: Error | null = null) {
+    execFileMock.mockClear();
+    execFileMock.mockImplementationOnce(((_file: string, _args: string[], callback: (error: Error | null) => void) => {
+      callback(error);
+    }) as unknown as typeof childProcess.execFile);
+    return execFileMock;
+  }
+
+  it("writes the prompt and a launcher only their owner can read, for the user to run on Linux", async () => {
     const sessionDir = path.join(dir, "sessions");
-    const files = writeAgentSession({
-      agent: "claude-code",
-      binaryPath: "/sample/bin/claude",
-      cwd: dir,
+    const started = await startAgentSession({
+      ...config,
       model: "opus",
       approval: "auto",
-      prompt: PROMPT,
       dir: sessionDir,
-      name: "sample",
-      platform: "darwin",
+      platform: "linux",
     });
 
+    expect(started.kind).toBe("command");
+    const files = filesOf(started);
     expect(files.promptPath).toBe(path.join(sessionDir, "sample.md"));
     expect(files.launcherPath).toBe(path.join(sessionDir, "sample.command"));
     expect(files.command).toBe(`sh '${files.launcherPath}'`);
@@ -124,23 +138,62 @@ describe("writeAgentSession", () => {
     );
   });
 
-  it("never overwrites a session's files", () => {
-    const config = { agent: "pi" as const, binaryPath: "/sample/bin/pi", cwd: dir, prompt: "hi", dir, name: "sample" };
-    writeAgentSession({ ...config, platform: "darwin" });
-    expect(() => writeAgentSession({ ...config, platform: "darwin" })).toThrow(/EEXIST/);
+  it("opens the launcher in a terminal window on macOS", async () => {
+    const open = stubOpen();
+
+    const started = await startAgentSession({ ...config, platform: "darwin" });
+
+    expect(started.kind).toBe("opened");
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(open.mock.calls[0].slice(0, 2)).toEqual(["open", [filesOf(started).launcherPath]]);
   });
 
-  it("refuses on Windows and a prompt too long for Linux, writing nothing", () => {
-    const config = { agent: "codex" as const, binaryPath: "/sample/bin/codex", cwd: dir, dir, name: "sample" };
-    expect(() => writeAgentSession({ ...config, prompt: "hi", platform: "win32" })).toThrow(/POSIX shell/);
-    expect(() => writeAgentSession({ ...config, prompt: "x".repeat(131_072), platform: "linux" })).toThrow(RangeError);
+  it("gives the command, with the files written, when the terminal window doesn't open", async () => {
+    stubOpen(new Error("sample failure"));
+
+    const started = await startAgentSession({ ...config, platform: "darwin" });
+
+    expect(started).toMatchObject({ kind: "command", terminalError: "sample failure" });
+    expect(fs.existsSync(filesOf(started).launcherPath)).toBe(true);
+  });
+
+  it("names the files by time and agent when given no name", async () => {
+    const started = await startAgentSession({ ...config, name: undefined, platform: "linux" });
+
+    expect(path.basename(filesOf(started).promptPath)).toMatch(
+      /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-claude-code-[0-9a-f]{4}\.md$/,
+    );
+  });
+
+  it("never overwrites a session's files", async () => {
+    await startAgentSession({ ...config, platform: "linux" });
+    await expect(startAgentSession({ ...config, platform: "linux" })).rejects.toThrow(/EEXIST/);
+  });
+
+  it("refuses on Windows, a prompt too long for Linux and an agent not on PATH, writing nothing", async () => {
+    await expect(startAgentSession({ ...config, platform: "win32" })).resolves.toMatchObject({
+      kind: "refused",
+      reason: "unsupported_platform",
+    });
+    await expect(
+      startAgentSession({ ...config, prompt: "x".repeat(131_072), platform: "linux" }),
+    ).resolves.toMatchObject({ kind: "refused", reason: "prompt_too_long" });
+    const pathBefore = process.env.PATH;
+    process.env.PATH = "";
+    try {
+      await expect(startAgentSession({ ...config, binaryPath: undefined, platform: "linux" })).resolves.toMatchObject({
+        kind: "refused",
+        reason: "agent_not_found",
+      });
+    } finally {
+      process.env.PATH = pathBefore;
+    }
     expect(fs.readdirSync(dir)).toEqual([]);
   });
-});
 
-describe("openInTerminal", () => {
-  it("refuses where no terminal window can be opened", async () => {
-    await expect(openInTerminal("/sample/sample.command", "linux")).rejects.toThrow(/not supported on linux/);
+  it("passes a prompt just under Linux's limit", async () => {
+    const started = await startAgentSession({ ...config, prompt: "x".repeat(131_071), platform: "linux" });
+    expect(started.kind).toBe("command");
   });
 });
 
@@ -165,16 +218,18 @@ describe("openInTerminal", () => {
     fs.writeFileSync(binaryPath, '#!/bin/sh\nprintf "%s\\n%s" "$#" "$(pwd -P)"\nprintf "\\n%s" "$@"\n', {
       mode: 0o700,
     });
-    const files = writeAgentSession({
-      agent: "codex",
-      binaryPath,
-      cwd,
-      model: "gpt-5.6-sol",
-      approval: "auto",
-      prompt: PROMPT,
-      dir: path.join(cwd, "sessions"),
-      name: "sample",
-    });
+    const files = filesOf(
+      await startAgentSession({
+        agent: "codex",
+        binaryPath,
+        cwd,
+        model: "gpt-5.6-sol",
+        approval: "auto",
+        prompt: PROMPT,
+        dir: path.join(cwd, "sessions"),
+        platform: "linux",
+      }),
+    );
 
     const { stdout } = await run("/bin/sh", ["-c", files.command], {
       env: { PATH: "/usr/bin:/bin", SAMPLE_TOKEN: "expanded", SAMPLE_URL: "expanded" },

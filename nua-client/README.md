@@ -221,29 +221,33 @@ const agents = await detectLocalAgents();
 Hand a prompt to the user's coding agent as an interactive session they carry on in a terminal, in their own project (unlike casts, which run in an empty sandbox):
 
 ```ts
-import { agentSessionMode, openInTerminal, writeAgentSession } from 'nuabase/local-agent';
+import { startAgentSession } from 'nuabase/local-agent';
 
-const session = writeAgentSession({
+const session = await startAgentSession({
   agent: 'claude-code',
   cwd: '/path/to/project',
   model: 'opus',
   approval: 'auto',
   prompt: 'Fix the failing import described in notes.md',
   dir: '/path/to/project/tmp/agent-sessions',
-  name: '2026-10-22-fix-import',
 });
-// -> { promptPath: '.../2026-10-22-fix-import.md', launcherPath: '.../2026-10-22-fix-import.command', command: "sh '...'" }
 
-if (agentSessionMode() === 'terminal') await openInTerminal(session.launcherPath);
-else console.log(`Run in a terminal: ${session.command}`);
+switch (session.kind) {
+  case 'opened': // macOS: a new terminal window is running the agent
+    break;
+  case 'command': // elsewhere, or the window didn't open (session.terminalError)
+    console.log(`Run in a terminal: ${session.files.command}`);
+    break;
+  case 'refused': // 'unsupported_platform' | 'prompt_too_long' | 'agent_not_found'; nothing written
+    console.error(session.message);
+}
 ```
 
-The prompt goes in its own file (`0600`), and the launcher (`0700`) passes it to the agent as one argument after `--`. Quotes, backticks and `$NAMES` in the prompt reach the agent as written, and the prompt can't set the agent's flags or run commands. Neither file is ever overwritten or deleted.
+It writes the prompt to its own file (`0600`) and a launcher (`0700`) that passes it to the agent as one argument after `--`. Quotes, backticks and `$NAMES` in the prompt reach the agent as written, and the prompt can't set the agent's flags or run commands. Neither file is ever overwritten or deleted. On macOS the launcher opens in a new window of the user's terminal app (`open`, which needs no Automation permission).
 
-* `writeAgentSession(config)` – Writes the prompt and launcher. Throws if the agent isn't found, on Windows, or for a prompt that `fitsAgentSession()` refuses.
-* `openInTerminal(launcherPath)` – Runs the launcher in a new window of the user's terminal app (macOS `open`, which needs no Automation permission). Rejects on other platforms.
-* `agentSessionMode(platform?)` – `'terminal'` on macOS, `'command'` on other POSIX systems (show the user `command`), `'none'` on Windows.
-* `fitsAgentSession(prompt, platform?)` – `false` for a prompt of 128 KiB or more on Linux, which caps a single argument at that size.
+Expected failures come back as `kind: 'refused'`, with nothing written: Windows, which can't run the launcher (`unsupported_platform`); a prompt of 128 KiB or more on Linux, which caps a single argument at that size (`prompt_too_long`); and an agent that isn't on `PATH` when no `binaryPath` is given (`agent_not_found`). It throws only for an unknown `agent` or a `name` already used.
+
+`agentSessionMode(platform?)` says beforehand how a session would start, for showing the right button: `'terminal'` on macOS, `'command'` on other POSIX systems, `'none'` on Windows.
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -254,7 +258,7 @@ The prompt goes in its own file (`0600`), and the launcher (`0700`) passes it to
 | `approval` | `'ask' \| 'auto'` | `'ask'` | `'auto'` starts the agent's auto mode (Claude Code `--permission-mode auto`, Codex `--approve-for-me`, Pi `--approve`). Its reviewer, not the user, approves routine edits and commands, and stops risky ones. |
 | `prompt` | `string` | Required | The session's first message. |
 | `dir` | `string` | Required | Where both files are written. Created if missing. |
-| `name` | `string` | Required | The files' name without extension. |
+| `name` | `string` | `<UTC time>-<agent>-<4 hex digits>` | The files' name without extension. Neither file may exist yet. |
 | `platform` | `NodeJS.Platform` | `process.platform` | The platform the launcher is for. |
 
 ---
