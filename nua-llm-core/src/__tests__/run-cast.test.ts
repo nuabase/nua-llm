@@ -123,13 +123,14 @@ describe("envelope", () => {
       examples: [literal],
     };
 
-    expect(wrapInEnvelope(schema).properties).toEqual({
+    const envelope = wrapInEnvelope(schema);
+    expect(envelope.$defs).toEqual({ row: { items: [{}] } });
+    expect(envelope.properties).toEqual({
       value: {
         type: "object",
         properties: { $schema: { type: "string" } },
         patternProperties: { "^x-": {} },
         additionalProperties: {},
-        $defs: { row: { items: [{}] } },
         anyOf: [{ not: {} }, true],
         if: {},
         then: { prefixItems: [{}] },
@@ -139,6 +140,93 @@ describe("envelope", () => {
         default: literal,
         examples: [literal],
       },
+    });
+  });
+
+  describe("refs", () => {
+    const Account = z.object({ name: z.string() }).meta({ id: "Account" });
+    const accountDefs = {
+      Account: {
+        type: "object",
+        properties: { name: { type: "string" } },
+        required: ["name"],
+      },
+    };
+
+    it("moves the definitions of a root schema with an id to the envelope's root", () => {
+      expect(wrapInEnvelope(describeSchema(Account))).toEqual({
+        type: "object",
+        properties: { value: { $ref: "#/$defs/Account" } },
+        required: ["value"],
+        additionalProperties: false,
+        $defs: accountDefs,
+      });
+    });
+
+    it("moves the definitions of a nested schema with an id to the envelope's root", () => {
+      const envelope = wrapInEnvelope(describeSchema(z.array(Account)));
+      expect(envelope.properties).toEqual({ value: { type: "array", items: { $ref: "#/$defs/Account" } } });
+      expect(envelope.$defs).toEqual(accountDefs);
+    });
+
+    it("moves the definitions of a list's item schema to the envelope's root", () => {
+      const { schema } = listSchema(Account, { primaryKey: "id", outputName: "account" });
+      const envelope = wrapInEnvelope(describeSchema(schema));
+      expect(envelope.properties).toEqual({
+        value: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: { id: { type: ["string", "number"] }, account: { $ref: "#/$defs/Account" } },
+            required: ["id", "account"],
+          },
+        },
+      });
+      expect(envelope.$defs).toEqual(accountDefs);
+    });
+
+    it("points a recursive schema's self-ref at the value field", () => {
+      type Category = { name: string; children: Category[] };
+      const Category: z.ZodType<Category> = z.object({
+        name: z.string(),
+        get children() {
+          return z.array(Category);
+        },
+      });
+      expect(wrapInEnvelope(describeSchema(Category)).properties).toEqual({
+        value: {
+          type: "object",
+          properties: { name: { type: "string" }, children: { type: "array", items: { $ref: "#/properties/value" } } },
+          required: ["name", "children"],
+        },
+      });
+    });
+
+    it("points local refs outside the definitions at the value field, in the definitions too", () => {
+      const envelope = wrapInEnvelope({
+        properties: { a: { $ref: "#/properties/b" }, b: { $ref: "#anchor" }, c: { $ref: "other.json#/x" } },
+        definitions: { row: { $ref: "#" }, cell: { $ref: "#/definitions/row" } },
+      });
+      expect(envelope.properties).toEqual({
+        value: {
+          properties: {
+            a: { $ref: "#/properties/value/properties/b" },
+            b: { $ref: "#anchor" },
+            c: { $ref: "other.json#/x" },
+          },
+        },
+      });
+      expect(envelope.definitions).toEqual({
+        row: { $ref: "#/properties/value" },
+        cell: { $ref: "#/definitions/row" },
+      });
+    });
+
+    it("leaves a $ref property name and a literal $ref value alone", () => {
+      const literal = { $ref: "#" };
+      expect(
+        wrapInEnvelope({ properties: { $ref: { const: literal } } }).properties,
+      ).toEqual({ value: { properties: { $ref: { const: literal } } } });
     });
   });
 
