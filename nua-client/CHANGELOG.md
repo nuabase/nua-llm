@@ -1,5 +1,33 @@
 # nuabase
 
+## 3.0.1
+
+### Patch Changes
+
+- bump version for release
+  Move build and test instructions out of the README
+  Type list() rows by the output's name
+  Answer a terminal window that didn't open as open_failed
+  Let local agents take an effort, and share one process limit across models
+  Keep a schema's refs resolvable inside the cast envelope
+  Validate cast results with Zod instead of AJV
+  Develop nuabase against zod 4.6.7
+  Say why a cast failed in the engine's own words
+  Start an agent session in one call: startAgentSession()
+  Bundle nuabase's type declarations in the same build as its JavaScript
+  Start interactive coding-agent sessions from nuabase/local-agent
+  Name edge runtimes, not browsers, as the reason to avoid node: imports
+  Move the Nuabase Gateway out of nua-llm
+  Rewrite nuabase's README around Quick Start and reference tables
+  Describe nuabase's data flow at the top of its README
+  Reject a @nuabase/gateway import in nuabase, and mark unpublished packages private
+  Have Nua call nua-llm-core's client directly
+  Split the Nuabase API client into @nuabase/gateway
+  Use provider prompt caching for casts and agents
+  Report provider prompt-cache tokens in usage
+  Add DeepSeek as a provider and move aliases to current models
+  Send Gemini thought signatures back with function calls
+
 ## 3.0.0
 
 ### Major Changes
