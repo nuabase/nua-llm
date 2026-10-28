@@ -14,4 +14,10 @@ describe("localAgentSetupGuide", () => {
       expect(setup.signIn).toContain(`\`${AGENT_ADAPTERS[setup.agent].binaryName}`);
     }
   });
+
+  it("asks a desktop agent to install each one", () => {
+    for (const setup of guide.agents) {
+      expect(guide.setupPrompt).toContain(setup.install);
+    }
+  });
 });
