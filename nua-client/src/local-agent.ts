@@ -9,6 +9,7 @@ export {
   isLocalAgentId,
   LOCAL_AGENT_IDS,
   localAgent,
+  localAgentSetupGuide,
   sessionLauncher,
   startAgentSession,
 } from 'nua-llm-core/local-agent';
@@ -25,6 +26,8 @@ export type {
   LocalAgentConfig,
   LocalAgentId,
   LocalAgentOptions,
+  LocalAgentSetup,
+  LocalAgentSetupGuide,
   LocalAgentStatus,
   Logger,
   SessionApproval,

@@ -12,6 +12,8 @@ export type { LocalAgent, LocalAgentCallOptions } from "./modules/engine/local-a
 export type { Logger } from "./lib/logger";
 export { detectLocalAgents } from "./modules/engine/local-agent/detect";
 export type { LocalAgentStatus } from "./modules/engine/local-agent/detect";
+export { localAgentSetupGuide } from "./modules/engine/local-agent/setup-guide";
+export type { LocalAgentSetup, LocalAgentSetupGuide } from "./modules/engine/local-agent/setup-guide";
 export { LOCAL_AGENT_IDS, isLocalAgentId } from "./modules/engine/local-agent/agent-id";
 export type { LocalAgentId } from "./modules/engine/local-agent/agent-id";
 export { agentSessionMode, sessionLauncher, startAgentSession } from "./modules/engine/local-agent/session";
