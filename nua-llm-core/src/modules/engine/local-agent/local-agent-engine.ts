@@ -1,7 +1,8 @@
 import { generateSpanId, logLlmCallError, Logger } from "../../../lib/logger";
 import { JsonSchema } from "../../../lib/schema-utils";
-import { AttemptFailure, AttemptOutcome, AttemptRequest, LlmEngine } from "../llm-engine";
-import { AgentAdapter, AgentCallOptions, AgentProcessResult } from "./adapters/types";
+import { AttemptFailure, AttemptOutcome, AttemptRequest, EngineOutputListener, LlmEngine } from "../llm-engine";
+import { stderrTail } from "./adapters/failure-classification";
+import { AgentAdapter, AgentCallOptions, AgentProcessResult, AgentProcessStop } from "./adapters/types";
 import { runInvocation } from "./process-runner";
 import { Semaphore } from "./semaphore";
 
@@ -20,6 +21,8 @@ export type AgentRunner = {
 export type AgentCall = AgentCallOptions & {
   /** Per-attempt limit. */
   timeoutMs: number;
+  /** How long an attempt may print nothing; null for no limit. */
+  idleTimeoutMs: number | null;
 };
 
 /**
@@ -36,13 +39,13 @@ export class LocalAgentEngine implements LlmEngine {
     return this.runner.adapter.nativeSchema(envelopeSchema);
   }
 
-  attempt(request: AttemptRequest): Promise<AttemptOutcome> {
-    return this.runner.limiter.run(() => this.runAgent(request));
+  attempt(request: AttemptRequest, onOutput?: EngineOutputListener): Promise<AttemptOutcome> {
+    return this.runner.limiter.run(() => this.runAgent(request, onOutput));
   }
 
-  private async runAgent(request: AttemptRequest): Promise<AttemptOutcome> {
+  private async runAgent(request: AttemptRequest, onOutput?: EngineOutputListener): Promise<AttemptOutcome> {
     const { adapter, binaryPath, logger, unsetEnv } = this.runner;
-    const { model, effort, timeoutMs } = this.call;
+    const { model, effort, timeoutMs, idleTimeoutMs } = this.call;
     const spanId = generateSpanId();
     const startTime = Date.now();
     const method = request.enforcement.kind;
@@ -68,14 +71,24 @@ export class LocalAgentEngine implements LlmEngine {
         binaryPath,
         invocation: adapter.buildInvocation(request, { model, effort }),
         timeoutMs,
+        idleTimeoutMs,
+        onOutput,
         unsetEnv,
       });
     } catch (error) {
       return failed({ kind: "fatal", message: error instanceof Error ? error.message : String(error) });
     }
 
-    if (result.timedOut) {
-      return failed({ kind: "fatal", message: `did not finish within ${timeoutMs}ms` });
+    const { listenerError } = result;
+    if (listenerError !== undefined) {
+      logger.warn("The onOutput listener threw; the agent ran on", {
+        span_id: spanId,
+        error: listenerError instanceof Error ? listenerError.message : String(listenerError),
+      });
+    }
+
+    if (result.stopped) {
+      return failed({ kind: "fatal", message: stopMessage(result.stopped, result) });
     }
 
     const reply = adapter.readResult(result, request);
@@ -105,4 +118,20 @@ export class LocalAgentEngine implements LlmEngine {
       },
     };
   }
+}
+
+/** Says which limit stopped the agent, how to raise it, and what the agent said on stderr. */
+function stopMessage(stopped: AgentProcessStop, result: AgentProcessResult): string {
+  const ran = `was stopped after ${seconds(stopped.afterMs)}`;
+  const reason =
+    stopped.limit === "idle"
+      ? `${ran}: it printed nothing for ${seconds(stopped.limitMs)} (idleTimeoutMs ${stopped.limitMs}). ` +
+        "Raise idleTimeoutMs, or set it to null for no limit."
+      : `${ran}, its limit (timeoutMs ${stopped.limitMs}). Raise timeoutMs.`;
+  const stderr = stderrTail(result, 500);
+  return stderr ? `${reason} Its stderr ended: ${stderr}` : reason;
+}
+
+function seconds(ms: number): string {
+  return ms < 10_000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.round(ms / 1000)} s`;
 }

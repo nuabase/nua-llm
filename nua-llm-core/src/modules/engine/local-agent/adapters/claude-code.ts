@@ -30,6 +30,9 @@ type ClaudeResultJson = {
 export const claudeCodeAdapter: AgentAdapter = {
   id: "claude-code",
   binaryName: "claude",
+  // Prints as it works (stream-json with --include-partial-messages; see
+  // buildInvocation), so a long silence means it is stuck.
+  idleTimeoutMs: 120_000,
   apiKeyEnvVars: ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"],
   modelAliases: { haiku: "haiku", sonnet: "sonnet", opus: "opus" },
 
@@ -40,10 +43,18 @@ export const claudeCodeAdapter: AgentAdapter = {
 
   buildInvocation(request: AttemptRequest, { model, effort }) {
     // Never pass --bare: it skips the keychain, so the subscription login is not used.
+    // stream-json prints as the model works, so the caller can watch. Only its
+    // final result line is read.
     const args = [
       "-p",
       "--output-format",
-      "json",
+      "stream-json",
+      // Required: with -p, stream-json is refused without --verbose.
+      "--verbose",
+      // Prints the reply in pieces as it is generated, not each message once it is done.
+      // Without it a long, healthy reply is silent until it ends, and
+      // idleTimeoutMs stops it.
+      "--include-partial-messages",
       "--tools",
       "",
       "--setting-sources",
@@ -66,10 +77,8 @@ export const claudeCodeAdapter: AgentAdapter = {
   },
 
   readResult(result: AgentProcessResult, request: AttemptRequest): AgentReply {
-    let json: ClaudeResultJson;
-    try {
-      json = JSON.parse(result.stdout);
-    } catch {
+    const json = lastResultLine(result.stdout);
+    if (!json) {
       return {
         kind: "failed",
         failure: classifyAgentFailure(
@@ -160,3 +169,19 @@ export const claudeCodeAdapter: AgentAdapter = {
     ];
   },
 };
+
+/** The `type: "result"` line stream-json ends with, which holds the answer, usage and any error. */
+function lastResultLine(stdout: string): ClaudeResultJson | undefined {
+  const lines = stdout.split("\n");
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i].trim();
+    if (!line.startsWith("{")) continue;
+    try {
+      const parsed = JSON.parse(line) as ClaudeResultJson;
+      if (parsed?.type === "result") return parsed;
+    } catch {
+      // Not a JSON line; keep looking.
+    }
+  }
+  return undefined;
+}

@@ -28,7 +28,7 @@ const inPromptRequest: AttemptRequest = {
 };
 
 function processResult(overrides: Partial<AgentProcessResult>): AgentProcessResult {
-  return { exitCode: 0, stdout: "", stderr: "", timedOut: false, outputFiles: {}, ...overrides };
+  return { exitCode: 0, stdout: "", stderr: "", stopped: null, outputFiles: {}, ...overrides };
 }
 
 describe("claudeCodeAdapter", () => {
@@ -49,8 +49,19 @@ describe("claudeCodeAdapter", () => {
     modelUsage: { "claude-haiku-4-5-20251001": { inputTokens: 2189, outputTokens: 267 } },
   };
 
+  /** stream-json output: progress lines, then the result line. */
+  const streamed = (result: object) =>
+    [
+      JSON.stringify({ type: "system", subtype: "init" }),
+      JSON.stringify({ type: "stream_event", event: { type: "content_block_delta" } }),
+      JSON.stringify(result),
+      "",
+    ].join("\n");
+
   it("builds a tool-less invocation that keeps the subscription login", () => {
     const invocation = claudeCodeAdapter.buildInvocation(nativeRequest, { model: "haiku" });
+    expect(invocation.args[invocation.args.indexOf("--output-format") + 1]).toBe("stream-json");
+    expect(invocation.args).toEqual(expect.arrayContaining(["--verbose", "--include-partial-messages"]));
     expect(invocation.args).toEqual(expect.arrayContaining(["-p", "--no-session-persistence"]));
     expect(invocation.args).not.toContain("--bare");
     expect(invocation.args[invocation.args.indexOf("--tools") + 1]).toBe("");
@@ -69,7 +80,7 @@ describe("claudeCodeAdapter", () => {
 
   it("returns the structured envelope and reports usage", () => {
     const reply = claudeCodeAdapter.readResult(
-      processResult({ stdout: JSON.stringify(success) }),
+      processResult({ stdout: streamed(success) }),
       nativeRequest,
     );
     expect(reply).toEqual({
@@ -89,7 +100,7 @@ describe("claudeCodeAdapter", () => {
 
   it("returns the raw reply as text for an in-prompt request", () => {
     const reply = claudeCodeAdapter.readResult(
-      processResult({ stdout: JSON.stringify({ ...success, structured_output: undefined, result: "[1,2]" }) }),
+      processResult({ stdout: streamed({ ...success, structured_output: undefined, result: "[1,2]" }) }),
       inPromptRequest,
     );
     expect(reply).toMatchObject({ kind: "answered", answer: { kind: "text", text: "[1,2]" } });
@@ -104,16 +115,16 @@ describe("claudeCodeAdapter", () => {
       result: "API Error: 400 tools.0.custom.input_schema.type: Input should be 'object'",
     };
     const reply = claudeCodeAdapter.readResult(
-      processResult({ exitCode: 1, stdout: JSON.stringify(refused) }),
+      processResult({ exitCode: 1, stdout: streamed(refused) }),
       nativeRequest,
     );
     expect(reply).toMatchObject({ kind: "failed", failure: { kind: "schema-rejected" } });
   });
 
   it("treats rate limits as fatal", () => {
-    const limited = { is_error: true, api_error_status: 429, result: "API Error: 429 rate_limit_error" };
+    const limited = { type: "result", is_error: true, api_error_status: 429, result: "API Error: 429 rate_limit_error" };
     const reply = claudeCodeAdapter.readResult(
-      processResult({ exitCode: 1, stdout: JSON.stringify(limited) }),
+      processResult({ exitCode: 1, stdout: streamed(limited) }),
       nativeRequest,
     );
     expect(reply).toMatchObject({ kind: "failed", failure: { kind: "fatal" } });
@@ -122,7 +133,7 @@ describe("claudeCodeAdapter", () => {
   it("treats a missing structured output as transient", () => {
     const empty = { ...success, structured_output: null };
     const reply = claudeCodeAdapter.readResult(
-      processResult({ stdout: JSON.stringify(empty) }),
+      processResult({ stdout: streamed(empty) }),
       nativeRequest,
     );
     expect(reply).toMatchObject({

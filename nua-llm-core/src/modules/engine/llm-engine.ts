@@ -56,11 +56,20 @@ export type AttemptOutcome =
   | { kind: "failed"; failure: AttemptFailure };
 
 /**
+ * Gets what an engine prints while it answers, unparsed, as it arrives: a
+ * coding agent's own output, to show as a log while a call runs. Chunks are
+ * UTF-8 text that doesn't follow line boundaries; a retry's output follows the
+ * earlier attempt's. Engines that print nothing, such as LLM providers' APIs,
+ * never call it.
+ */
+export type EngineOutputListener = (chunk: string, stream: "stdout" | "stderr") => void;
+
+/**
  * Answers prompts on one model: an LLM provider's HTTP API, or a coding-agent
  * CLI on this machine. Expected failures come back as outcomes, not exceptions.
  */
 export interface LlmEngine {
   /** The envelope schema in the form this engine enforces natively, or null if it cannot. */
   nativeSchema(envelopeSchema: JsonSchema): JsonSchema | null;
-  attempt(request: AttemptRequest): Promise<AttemptOutcome>;
+  attempt(request: AttemptRequest, onOutput?: EngineOutputListener): Promise<AttemptOutcome>;
 }

@@ -24,9 +24,10 @@ describe("runInvocation", () => {
         outputFiles: ["out.txt", "never-written.txt"],
       },
       timeoutMs: 10_000,
+      idleTimeoutMs: null,
     });
     expect(result.exitCode).toBe(0);
-    expect(result.timedOut).toBe(false);
+    expect(result.stopped).toBeNull();
     expect(result.stdout.trim()).toBe("cwd-empty-before-run:true");
     expect(result.outputFiles["out.txt"]).toBe('SAMPLE PROMPT|{"type":"object"}');
     expect(result.outputFiles["never-written.txt"]).toBeUndefined();
@@ -39,6 +40,7 @@ describe("runInvocation", () => {
         binaryPath: node,
         invocation: { args: ["-e", "console.log(String(process.env.NUA_TEST_SECRET_050505))"], stdin: "" },
         timeoutMs: 10_000,
+        idleTimeoutMs: null,
         unsetEnv: ["NUA_TEST_SECRET_050505"],
       });
       expect(result.stdout.trim()).toBe("undefined");
@@ -52,8 +54,74 @@ describe("runInvocation", () => {
       binaryPath: node,
       invocation: { args: ["-e", "setTimeout(() => {}, 60000)"], stdin: "" },
       timeoutMs: 200,
+      idleTimeoutMs: null,
     });
-    expect(result.timedOut).toBe(true);
+    expect(result.stopped).toEqual({ limit: "total", limitMs: 200, afterMs: expect.any(Number) });
+    expect(result.stopped!.afterMs).toBeGreaterThanOrEqual(200);
+  });
+
+  it("stops a process that prints nothing for the idle limit, but not one that keeps printing", async () => {
+    const quiet = await runInvocation({
+      binaryPath: node,
+      invocation: { args: ["-e", "setTimeout(() => {}, 60000)"], stdin: "" },
+      timeoutMs: 10_000,
+      idleTimeoutMs: 200,
+    });
+    expect(quiet.stopped).toMatchObject({ limit: "idle", limitMs: 200 });
+
+    // Prints every 100 ms for 600 ms: longer than the idle limit in all, never quiet for it.
+    const chatty = await runInvocation({
+      binaryPath: node,
+      invocation: {
+        args: ["-e", "let n = 0; const t = setInterval(() => { console.log(n); if (++n === 6) clearInterval(t); }, 100)"],
+        stdin: "",
+      },
+      timeoutMs: 10_000,
+      idleTimeoutMs: 300,
+    });
+    expect(chatty.stopped).toBeNull();
+    expect(chatty.stdout.trim().split("\n")).toEqual(["0", "1", "2", "3", "4", "5"]);
+  });
+
+  it("passes output to the listener as it arrives, and still returns all of it", async () => {
+    const seen: { chunk: string; stream: string; at: number }[] = [];
+    const started = Date.now();
+    const result = await runInvocation({
+      binaryPath: node,
+      invocation: {
+        args: ["-e", "console.log('first'); console.error('warn'); setTimeout(() => console.log('später ✓'), 300)"],
+        stdin: "",
+      },
+      timeoutMs: 10_000,
+      idleTimeoutMs: null,
+      onOutput: (chunk, stream) => seen.push({ chunk, stream, at: Date.now() - started }),
+    });
+    const text = (stream: string) => seen.filter((s) => s.stream === stream).map((s) => s.chunk).join("");
+    expect(text("stdout")).toBe(result.stdout);
+    expect(text("stderr")).toBe(result.stderr);
+    expect(result.stdout).toBe("first\nspäter ✓\n");
+    expect(result.stderr).toBe("warn\n");
+    // The first line arrived before the process ended, not with the result.
+    const first = seen.find((s) => s.chunk.includes("first"))!;
+    const last = seen.find((s) => s.chunk.includes("später"))!;
+    expect(last.at - first.at).toBeGreaterThanOrEqual(200);
+  });
+
+  it("keeps running when the listener throws, and returns its first error", async () => {
+    let calls = 0;
+    const result = await runInvocation({
+      binaryPath: node,
+      invocation: { args: ["-e", "console.log('a'); setTimeout(() => console.log('b'), 50)"], stdin: "" },
+      timeoutMs: 10_000,
+      idleTimeoutMs: null,
+      onOutput: () => {
+        throw new Error(`sample listener failure ${++calls}`);
+      },
+    });
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toBe("a\nb\n");
+    expect(calls).toBe(2);
+    expect(result.listenerError).toEqual(new Error("sample listener failure 1"));
   });
 
   it("rejects when the binary does not exist", async () => {
@@ -62,6 +130,7 @@ describe("runInvocation", () => {
         binaryPath: "/nonexistent/sample-agent-050505",
         invocation: { args: [], stdin: "" },
         timeoutMs: 1000,
+        idleTimeoutMs: null,
       }),
     ).rejects.toThrow(/Could not start .*: not found/);
   });

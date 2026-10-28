@@ -6,6 +6,7 @@ import { CastRequest } from "./modules/cast/cast-request";
 import { ListSchema } from "./modules/cast/list-schema";
 import { CastResult, refusedCast, runCast } from "./modules/cast/run-cast";
 import { EngineRouter } from "./modules/engine/engine-router";
+import { EngineOutputListener } from "./modules/engine/llm-engine";
 import { ModelInput } from "./modules/model-info";
 
 export type CastValueParams = {
@@ -13,6 +14,7 @@ export type CastValueParams = {
   maxTokens?: number;
   input: { prompt: string; data?: unknown };
   output: { name: string; schema: z.ZodType };
+  onOutput?: EngineOutputListener;
 };
 
 export type CastArrayParams = {
@@ -21,6 +23,7 @@ export type CastArrayParams = {
   input: { prompt: string; data: unknown[] };
   /** Built with listSchema(); it names each row's primary key and output field. */
   output: ListSchema;
+  onOutput?: EngineOutputListener;
 };
 
 const DEFAULT_MAX_TOKENS = 4096;
@@ -51,7 +54,7 @@ export class NuaLlmClient {
       jsonSchema,
       maxTokens: params.maxTokens ?? DEFAULT_MAX_TOKENS,
     };
-    return runCast<T>(route.engine, request, this.engines.logger);
+    return runCast<T>(route.engine, request, this.engines.logger, params.onOutput);
   }
 
   async castArray<T = unknown>(params: CastArrayParams): Promise<CastResult<T[]>> {
@@ -77,7 +80,7 @@ export class NuaLlmClient {
       jsonSchema,
       maxTokens: params.maxTokens ?? DEFAULT_MAX_TOKENS,
     };
-    return runCast<T[]>(route.engine, request, this.engines.logger);
+    return runCast<T[]>(route.engine, request, this.engines.logger, params.onOutput);
   }
 }
 

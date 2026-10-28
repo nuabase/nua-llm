@@ -13,6 +13,7 @@ export type {
 export type { CastResult, NormalizedUsage, DirectMeta, CastResultSource } from './types';
 export type {
   AnswerOrigin,
+  EngineOutputListener,
   LlmProviderId,
   LocalAgentId,
   ModelInput,

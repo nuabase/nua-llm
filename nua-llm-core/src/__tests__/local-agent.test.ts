@@ -6,6 +6,7 @@ import { AgentAdapter, AgentCallOptions } from "../modules/engine/local-agent/ad
 import { localAgent } from "../modules/engine/local-agent/create-local-agent";
 import { LocalAgent } from "../modules/engine/local-agent/local-agent";
 import { Semaphore } from "../modules/engine/local-agent/semaphore";
+import { EngineOutputListener } from "../modules/engine/llm-engine";
 import { ModelInput } from "../modules/model-info";
 
 const silentLogger: Logger = {
@@ -55,15 +56,13 @@ function stubAgent(
 }
 
 /** Routes `model` on `agent`, runs one attempt, and returns the origin it reports. */
-async function originOfAttempt(agent: LocalAgent, model: ModelInput | undefined) {
+async function originOfAttempt(agent: LocalAgent, model: ModelInput | undefined, onOutput?: EngineOutputListener) {
   const route = agent.route(model);
   if (route.kind !== "routed") throw new Error(route.message);
-  const outcome = await route.engine.attempt({
-    prompt: "p",
-    reusablePrefix: "",
-    maxTokens: 100,
-    enforcement: { kind: "in-prompt" },
-  });
+  const outcome = await route.engine.attempt(
+    { prompt: "p", reusablePrefix: "", maxTokens: 100, enforcement: { kind: "in-prompt" } },
+    onOutput,
+  );
   if (outcome.kind !== "answered") throw new Error(outcome.failure.message);
   return outcome.origin;
 }
@@ -144,6 +143,31 @@ describe("LocalAgent.with", () => {
     expect(Date.now() - started).toBeGreaterThanOrEqual(600);
   });
 
+  it("passes the agent's output to the listener of the attempt it belongs to", async () => {
+    const { agent } = stubAgent(codexAdapter, undefined, { concurrency: 2, script: "console.log(process.pid)" });
+    const first: string[] = [];
+    const second: string[] = [];
+    await Promise.all([
+      originOfAttempt(agent, undefined, (chunk) => first.push(chunk)),
+      originOfAttempt(agent, undefined, (chunk) => second.push(chunk)),
+    ]);
+    expect(first.join("")).toMatch(/^\d+\n$/);
+    expect(second.join("")).toMatch(/^\d+\n$/);
+    expect(first.join("")).not.toBe(second.join(""));
+  });
+
+  it("says which limit stopped an agent and how to raise it", async () => {
+    const { agent } = stubAgent(claudeCodeAdapter, undefined, {
+      script: "console.error('sample stderr'); setTimeout(() => {}, 60000)",
+    });
+    await expect(originOfAttempt(agent.with({ idleTimeoutMs: 200 }), undefined)).rejects.toThrow(
+      /printed nothing for 0\.2 s \(idleTimeoutMs 200\)\. Raise idleTimeoutMs, or set it to null for no limit\. Its stderr ended: sample stderr/,
+    );
+    await expect(
+      originOfAttempt(agent.with({ timeoutMs: 200, idleTimeoutMs: null }), undefined),
+    ).rejects.toThrow(/its limit \(timeoutMs 200\)\. Raise timeoutMs\./);
+  });
+
   it("rejects an empty model", () => {
     const { agent } = stubAgent(codexAdapter, undefined);
     expect(() => agent.with({ model: " " })).toThrow(/non-empty/);
@@ -174,7 +198,12 @@ describe("localAgent", () => {
   it("rejects invalid options", () => {
     const binaryPath = process.execPath;
     expect(() => localAgent({ agent: "codex", binaryPath, concurrency: 0 })).toThrow(/concurrency/);
-    expect(() => localAgent({ agent: "codex", binaryPath, model: " " })).toThrow(/omit it/);
+    expect(() => localAgent({ agent: "codex", binaryPath, model: " " })).toThrow(/non-empty/);
+    for (const ms of [0, -1, NaN, Infinity, 2 ** 31]) {
+      expect(() => localAgent({ agent: "codex", binaryPath, timeoutMs: ms })).toThrow(/timeoutMs must be/);
+      expect(() => localAgent({ agent: "codex", binaryPath, idleTimeoutMs: ms })).toThrow(/idleTimeoutMs must be/);
+    }
+    expect(() => localAgent({ agent: "codex", binaryPath, idleTimeoutMs: null })).not.toThrow();
     expect(() => localAgent({ agent: "sample" as never, binaryPath })).toThrow(/Unknown local agent/);
   });
 });

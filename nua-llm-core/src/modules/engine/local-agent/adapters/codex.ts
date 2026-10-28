@@ -18,6 +18,8 @@ type CodexEvent = {
 export const codexAdapter: AgentAdapter = {
   id: "codex",
   binaryName: "codex",
+  // Prints nothing while it reasons, so silence says nothing about whether it is stuck.
+  idleTimeoutMs: null,
   apiKeyEnvVars: ["OPENAI_API_KEY", "CODEX_API_KEY"],
   // Codex's models have no equivalent among the aliases; set one with localAgent({ model }).
   modelAliases: {},

@@ -7,6 +7,7 @@ import {
   AnswerOrigin,
   AttemptFailure,
   AttemptOutcome,
+  EngineOutputListener,
   LlmEngine,
   SchemaEnforcement,
   SchemaEnforcementKind,
@@ -71,18 +72,22 @@ export async function runCast<T>(
   engine: LlmEngine,
   request: CastRequest,
   logger: Logger,
+  onOutput?: EngineOutputListener,
 ): Promise<CastResult<T>> {
   const validate = validatorFor(request.schema);
   let plan = planAttempt(request, chooseEnforcement(engine, request.jsonSchema));
   let lastFailure = { error: "", prompt: plan.prompt };
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    const outcome = await engine.attempt({
-      prompt: plan.prompt.full,
-      reusablePrefix: plan.prompt.reusablePrefix,
-      maxTokens: request.maxTokens,
-      enforcement: plan.enforcement,
-    });
+    const outcome = await engine.attempt(
+      {
+        prompt: plan.prompt.full,
+        reusablePrefix: plan.prompt.reusablePrefix,
+        maxTokens: request.maxTokens,
+        enforcement: plan.enforcement,
+      },
+      onOutput,
+    );
     const verdict = judgeOutcome(outcome, validate);
 
     if (verdict.kind === "accept") {

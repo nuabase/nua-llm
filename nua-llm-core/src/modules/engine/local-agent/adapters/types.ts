@@ -18,10 +18,19 @@ export type AgentProcessResult = {
   exitCode: number | null;
   stdout: string;
   stderr: string;
-  timedOut: boolean;
+  /** The limit that stopped the process; null when none did. */
+  stopped: AgentProcessStop | null;
   /** Contents of the requested output files; undefined when a file was not written. */
   outputFiles: Record<string, string | undefined>;
+  /** The first error the output listener threw. The process ran on regardless. */
+  listenerError?: unknown;
 };
+
+/**
+ * Which limit stopped a process: the whole run's ("total") or the one on going
+ * quiet ("idle"), how long that limit was, and how long after starting it fired.
+ */
+export type AgentProcessStop = { limit: "total" | "idle"; limitMs: number; afterMs: number };
 
 /** What an agent's output says about one attempt. */
 export type AgentReply =
@@ -70,6 +79,11 @@ export interface AgentAdapter {
   binaryName: string;
   /** Env vars that would make the CLI bill an API key instead of the user's subscription. */
   apiKeyEnvVars: string[];
+  /**
+   * How long the CLI may print nothing before it counts as stuck, or null when
+   * it can be quiet for long stretches while working, as Codex is while it reasons.
+   */
+  idleTimeoutMs: number | null;
   /** The CLI's own model name for each model alias it has an equivalent for. */
   modelAliases: Partial<Record<ModelAliasName, string>>;
 

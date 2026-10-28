@@ -1,9 +1,9 @@
 import { ConsoleLogger, Logger } from "../../../lib/logger";
 import { AGENT_ADAPTERS } from "./adapters";
-import { AgentAdapter, AgentEffort } from "./adapters/types";
+import { AgentAdapter } from "./adapters/types";
 import { isLocalAgentId, LocalAgentId } from "./agent-id";
 import { detectLocalAgents } from "./detect";
-import { LocalAgent } from "./local-agent";
+import { LocalAgent, LocalAgentCallOptions } from "./local-agent";
 import { findOnPath } from "./process-runner";
 import { Semaphore } from "./semaphore";
 
@@ -14,13 +14,7 @@ import { Semaphore } from "./semaphore";
  */
 export type LocalAgentAuthMode = "subscription" | "inherit";
 
-export type LocalAgentOptions = {
-  /** The agent's own model name (e.g. "haiku" for Claude Code) for calls that name no model. Defaults to the agent's default. */
-  model?: string;
-  /** How hard the model thinks, as the CLI's own reasoning or effort setting. Defaults to the CLI's default. */
-  effort?: AgentEffort;
-  /** Per-call limit in milliseconds. Defaults to 180000. */
-  timeoutMs?: number;
+export type LocalAgentOptions = LocalAgentCallOptions & {
   /** Maximum agent processes running at once. Defaults to 2. */
   concurrency?: number;
   /** Defaults to "subscription". */
@@ -35,7 +29,6 @@ export type LocalAgentConfig = LocalAgentOptions & {
   binaryPath?: string;
 };
 
-const DEFAULT_TIMEOUT_MS = 180_000;
 const DEFAULT_CONCURRENCY = 2;
 
 /**
@@ -46,14 +39,12 @@ export function localAgent(config: LocalAgentConfig): LocalAgent {
   if (!isLocalAgentId(config.agent)) {
     throw new TypeError(`Unknown local agent: ${String(config.agent)}`);
   }
-  const settings = parseOptions(config);
-
   const adapter = AGENT_ADAPTERS[config.agent];
   const binaryPath = config.binaryPath ?? findOnPath(adapter.binaryName);
   if (!binaryPath) {
     throw new Error(`${adapter.binaryName} was not found on PATH. Install ${config.agent} or set binaryPath.`);
   }
-  return setUpLocalAgent(adapter, binaryPath, settings);
+  return setUpLocalAgent(adapter, binaryPath, config);
 }
 
 /**
@@ -61,12 +52,10 @@ export function localAgent(config: LocalAgentConfig): LocalAgent {
  * trying Claude Code first. Rejects when none is. Node.js only.
  */
 export async function findLocalAgent(options: LocalAgentOptions = {}): Promise<LocalAgent> {
-  const settings = parseOptions(options);
-
   const statuses = await detectLocalAgents();
   for (const status of statuses) {
     if (status.installed && status.loggedIn) {
-      return setUpLocalAgent(AGENT_ADAPTERS[status.agent], status.binaryPath, settings);
+      return setUpLocalAgent(AGENT_ADAPTERS[status.agent], status.binaryPath, options);
     }
   }
 
@@ -76,34 +65,7 @@ export async function findLocalAgent(options: LocalAgentOptions = {}): Promise<L
   throw new Error(`No logged-in coding agent found (${summary})`);
 }
 
-type Settings = {
-  model: string | undefined;
-  effort: AgentEffort | undefined;
-  timeoutMs: number;
-  concurrency: number;
-  auth: LocalAgentAuthMode;
-  logger: Logger;
-};
-
-function parseOptions(options: LocalAgentOptions): Settings {
-  const concurrency = options.concurrency ?? DEFAULT_CONCURRENCY;
-  if (!Number.isInteger(concurrency) || concurrency < 1) {
-    throw new TypeError("concurrency must be a positive integer");
-  }
-  if (options.model !== undefined && options.model.trim() === "") {
-    throw new TypeError("model must be a non-empty string; omit it to use the agent's default model");
-  }
-  return {
-    model: options.model,
-    effort: options.effort,
-    timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
-    concurrency,
-    auth: options.auth ?? "subscription",
-    logger: options.logger ?? new ConsoleLogger(),
-  };
-}
-
-function setUpLocalAgent(adapter: AgentAdapter, binaryPath: string, settings: Settings): LocalAgent {
+function setUpLocalAgent(adapter: AgentAdapter, binaryPath: string, options: LocalAgentOptions): LocalAgent {
   if (/\.(cmd|bat)$/i.test(binaryPath)) {
     // Running .cmd shims needs a shell, and cmd.exe quoting would mangle the
     // JSON schema and empty-string arguments.
@@ -113,16 +75,17 @@ function setUpLocalAgent(adapter: AgentAdapter, binaryPath: string, settings: Se
     );
   }
 
+  const concurrency = options.concurrency ?? DEFAULT_CONCURRENCY;
+  if (!Number.isInteger(concurrency) || concurrency < 1) {
+    throw new TypeError("concurrency must be a positive integer");
+  }
+
   const runner = {
     adapter,
     binaryPath,
-    unsetEnv: settings.auth === "subscription" ? adapter.apiKeyEnvVars : [],
-    limiter: new Semaphore(settings.concurrency),
-    logger: settings.logger,
+    unsetEnv: (options.auth ?? "subscription") === "subscription" ? adapter.apiKeyEnvVars : [],
+    limiter: new Semaphore(concurrency),
+    logger: options.logger ?? new ConsoleLogger(),
   };
-  return new LocalAgent(runner, {
-    model: settings.model,
-    effort: settings.effort,
-    timeoutMs: settings.timeoutMs,
-  });
+  return new LocalAgent(runner, options);
 }

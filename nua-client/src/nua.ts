@@ -3,6 +3,7 @@ import { listSchema, NuaLlmClient, providerEngines } from 'nua-llm-core';
 import type {
   AnswerOrigin,
   CastResult as CoreCastResult,
+  EngineOutputListener,
   EngineRouter,
   LlmProviderId,
   ModelInput,
@@ -36,6 +37,8 @@ export type GetOptions<TSchema extends z.ZodTypeAny> = {
   input?: unknown;
   output: OutputDef<TSchema>;
   model?: ModelInput;
+  /** Gets what a local agent prints while this call runs. */
+  onOutput?: EngineOutputListener;
 };
 
 export type ListOptions<
@@ -48,6 +51,8 @@ export type ListOptions<
   primaryKey: PrimaryKey;
   output: OutputDef<TSchema, TName>;
   model?: ModelInput;
+  /** Gets what a local agent prints while this call runs. */
+  onOutput?: EngineOutputListener;
 };
 
 // Result row for list operations: primaryKey + output field
@@ -104,6 +109,7 @@ export class Nua {
       model: options?.model,
       input: { prompt, data: options?.input ?? null },
       output: { name: outputName, schema: outputSchema },
+      onOutput: options?.onOutput,
     });
     return toDirectResult(result, Date.now() - startTime);
   }
@@ -141,6 +147,7 @@ export class Nua {
       model: options.model,
       input: { prompt, data: options.input },
       output,
+      onOutput: options.onOutput,
     });
     return toDirectResult(result, Date.now() - startTime);
   }

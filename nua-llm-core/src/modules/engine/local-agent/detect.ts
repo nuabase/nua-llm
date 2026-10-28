@@ -44,11 +44,13 @@ async function detectAgent(
         binaryPath,
         invocation: { args: ["--version"], stdin: "" },
         timeoutMs: STATUS_TIMEOUT_MS,
+        idleTimeoutMs: null,
       }),
       runInvocation({
         binaryPath,
         invocation: { args: adapter.loginStatusArgs, stdin: "" },
         timeoutMs: STATUS_TIMEOUT_MS,
+        idleTimeoutMs: null,
         // Report the CLI's own login, not an API key that happens to be set.
         unsetEnv: adapter.apiKeyEnvVars,
       }),

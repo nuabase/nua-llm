@@ -110,6 +110,7 @@ if (address.success) console.log(address.data); // z.infer<typeof AddressSchema>
 * `input?: unknown` – Context or data to include with the prompt.
 * `output: { name: string; schema: ZodSchema }` – Identifier and Zod schema for the output.
 * `model?: ModelInput` – Override the client's default model for this call.
+* `onOutput?: (chunk, stream) => void` – On a local agent, gets everything the agent prints while this call runs, unparsed, as it arrives (`stream` is `'stdout'` or `'stderr'`), to show as a log. Chunks don't follow line boundaries, and a retry's output follows the earlier attempt's. Provider APIs print nothing, so it is never called.
 
 ### `nua.list(prompt, options)`
 
@@ -133,6 +134,7 @@ if (result.success) {
 * `primaryKey: string` – Unique key on each input object. Each output row carries it, so you can match rows to inputs.
 * `output: { name: string; schema: ZodSchema }` – Property name and Zod schema attached to each returned row.
 * `model?: ModelInput` – Override the client's default model for this call.
+* `onOutput?: (chunk, stream) => void` – As for `get()`.
 
 ---
 
@@ -210,18 +212,25 @@ const agents = await detectLocalAgents();
 | `binaryPath` | `string` | Looked up on `PATH` | Path to executable (`localAgent` only). On Windows, point to a native executable (`.cmd` shims are not supported). |
 | `model` | `string` | Agent's default | The agent's own model name for calls that name no model. Claude Code accepts aliases (`'haiku'`, `'sonnet'`, `'opus'`), and so does a per-call `model: { alias }`. Codex and Pi have no aliases: Codex uses its own model names; Pi uses `'provider/id'` (e.g., `'openrouter/z-ai/glm-5.3-flash'`). |
 | `effort` | `'low' \| 'medium' \| 'high'` | Agent's default | How hard the model thinks, as the CLI's own setting: Claude Code `--effort`, Codex `model_reasoning_effort`, Pi `--thinking`. |
-| `timeoutMs` | `number` | `180000` | Maximum execution time per call in milliseconds. |
+| `timeoutMs` | `number` | `600000` | Maximum execution time per call in milliseconds, from 1 to 2147483647. |
+| `idleTimeoutMs` | `number \| null` | `120000`; none for Codex | Stops the agent when it prints nothing for this many milliseconds (1 to 2147483647), so a stuck agent fails early and a slow one still finishes. `null` for no limit. Codex has none by default: it prints nothing while it reasons. |
 | `concurrency` | `number` | `2` | Maximum concurrent agent processes. |
 | `auth` | `'subscription' \| 'inherit'` | `'subscription'` | `'subscription'` strips env vars like `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` so calls bill your logged-in plan instead of API keys. |
 | `logger` | object | `console` | Object with `debug`, `info`, `warn`, and `error` methods for call and retry logs. |
 
-`agent.with({ model, effort, timeoutMs })` returns the same agent with other call options. It shares the agent's executable, environment, logger and `concurrency` limit, so one `localAgent()` per CLI can serve casts on several of its models without running more processes at once than the limit allows. Options left out keep the agent's; a `model` or `effort` given as `undefined` is the CLI's default.
+`agent.with({ model, effort, timeoutMs, idleTimeoutMs })` returns the same agent with other call options. It shares the agent's executable, environment, logger and `concurrency` limit, so one `localAgent()` per CLI can serve casts on several of its models without running more processes at once than the limit allows. Options left out keep the agent's; an option given as `undefined` takes its default.
 
 ```ts
 const codex = localAgent({ agent: 'codex', concurrency: 2 });
 const quick = Nua.direct({ localAgent: codex.with({ model: 'gpt-5.6-terra', effort: 'low' }) });
 const careful = Nua.direct({ localAgent: codex.with({ model: 'gpt-5.6-sol', timeoutMs: 300_000 }) });
 // Both run on the same two processes at most.
+```
+
+To show a call's progress, pass `onOutput` with the call. What the agent prints is its own JSON lines, which nuabase passes on as they are:
+
+```ts
+const result = await nua.get(prompt, { output: { name: 'chart', schema }, onOutput: (chunk) => res.write(chunk) });
 ```
 
 > **Note:** Local agent calls count against your personal subscription limits. Check each vendor's terms before exposing local-agent execution to end users.

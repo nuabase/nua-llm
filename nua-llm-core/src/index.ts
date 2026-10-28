@@ -13,6 +13,7 @@ export type { ProviderEngines, ProviderEnginesConfig } from "./modules/engine/ht
 export type { EngineRouter, Route } from "./modules/engine/engine-router";
 export type {
   AnswerOrigin,
+  EngineOutputListener,
   LlmEngine,
   SchemaEnforcementKind,
 } from "./modules/engine/llm-engine";

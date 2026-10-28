@@ -40,6 +40,8 @@ type PiEvent = {
 export const piAdapter: AgentAdapter = {
   id: "pi",
   binaryName: "pi",
+  // Streams as it works (--mode json), so a long silence means it is stuck.
+  idleTimeoutMs: 120_000,
   // Every environment credential Pi's providers recognize. Under `auth:
   // "subscription"` these are removed so Pi bills its own `auth.json` login.
   apiKeyEnvVars: [
