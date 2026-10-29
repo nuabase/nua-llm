@@ -330,11 +330,11 @@ The call rejects (throws) only for invalid arguments, before anything is sent: a
 | --- | --- | --- |
 | `success` | `false` | Request failed (see retries below). |
 | `error` | `string` | Error description. |
+| `cancelled` | `boolean` | `true` when the call's `signal` cancelled it. |
 | `source` | `'direct'` | Indicates the request executed in-process. |
 | `latencyMs` | `number` | Time elapsed until failure in milliseconds. |
 
 > **💡 Tip: Maximize Prompt Caching**
-| `cancelled` | `boolean` | `true` when the call's `signal` cancelled it. |
 > Keep your `prompt` string static across calls and pass dynamic values via `input`. Nuabase places the prompt and schema at the beginning of the payload so providers can cache that prefix. Cache reads are heavily discounted—whereas on providers like Claude, changing the prompt prefix on every call incurs a 25% cache-write premium without ever getting a cache hit.
 
 ---
