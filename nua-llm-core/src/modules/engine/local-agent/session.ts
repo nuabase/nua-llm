@@ -29,6 +29,11 @@ import { findOnPath } from "./process-runner";
  * options, never prompt text, so a prompt can't inject commands. It runs from
  * `cwd`, so the agent loads the project's AGENTS.md / CLAUDE.md, and runs the
  * binary at an absolute path, whatever the terminal's PATH.
+ *
+ * On macOS, `open` passes its environment to a terminal app it launches, and
+ * every later window of that app inherits it. `env` sets that environment, so
+ * a caller can keep its own settings out of the user's terminal, and
+ * `unsetEnv` has the launcher unset names a terminal may already hold.
  */
 
 /**
@@ -60,6 +65,17 @@ export type AgentSessionConfig = {
   name?: string;
   /** Defaults to process.platform. */
   platform?: NodeJS.Platform;
+  /**
+   * The environment `open` runs in on macOS. A terminal app it launches keeps
+   * it for every window, so leave out what other sessions shouldn't see.
+   * Defaults to process.env.
+   */
+  env?: NodeJS.ProcessEnv;
+  /**
+   * Variables the launcher unsets before starting the agent, for a terminal
+   * that already holds them. Each must be a shell variable name.
+   */
+  unsetEnv?: readonly string[];
 };
 
 export type AgentSessionFiles = {
@@ -98,6 +114,8 @@ export type AgentSessionStart =
 // together, at 1 MiB.
 const LINUX_MAX_ARGUMENT_BYTES = 131_072;
 
+const SHELL_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
 /** Pure: how a session can be started on `platform`. */
 export function agentSessionMode(platform: NodeJS.Platform = process.platform): AgentSessionMode {
   if (platform === "win32") return "none";
@@ -107,12 +125,16 @@ export function agentSessionMode(platform: NodeJS.Platform = process.platform): 
 /**
  * Writes the prompt and a launcher that starts the agent on it, and where the
  * platform can, opens a terminal window running it. Expected failures come
- * back as the result; it throws only for an unknown agent or a `name` already
- * used. Node.js only.
+ * back as the result; it throws only for an unknown agent, an `unsetEnv` entry that
+ * isn't a variable name or a `name` already used. Node.js only.
  */
 export async function startAgentSession(config: AgentSessionConfig): Promise<AgentSessionStart> {
   if (!isLocalAgentId(config.agent)) {
     throw new TypeError(`Unknown local agent: ${String(config.agent)}`);
+  }
+  const badName = config.unsetEnv?.find((name) => !SHELL_NAME.test(name));
+  if (badName !== undefined) {
+    throw new TypeError(`Not a shell variable name in unsetEnv: ${JSON.stringify(badName)}`);
   }
   const platform = config.platform ?? process.platform;
   const mode = agentSessionMode(platform);
@@ -134,7 +156,7 @@ export async function startAgentSession(config: AgentSessionConfig): Promise<Age
   const files = writeSessionFiles(config, binaryPath, adapter.sessionArgs(config.model, config.approval ?? "ask"));
   if (mode === "command") return { kind: "command", files };
   try {
-    await promisify(execFile)("open", [files.launcherPath]);
+    await promisify(execFile)("open", [files.launcherPath], { env: config.env ?? process.env });
   } catch (error) {
     return { kind: "open_failed", files, error: error instanceof Error ? error.message : String(error) };
   }
@@ -151,7 +173,7 @@ function writeSessionFiles(config: AgentSessionConfig, binaryPath: string, agent
   const promptPath = path.join(config.dir, `${name}.md`);
   const launcherPath = path.join(config.dir, `${name}.command`);
   fs.writeFileSync(promptPath, config.prompt, { mode: 0o600, flag: "wx" });
-  fs.writeFileSync(launcherPath, sessionLauncher({ cwd: config.cwd, binaryPath, agentArgs, promptPath }), {
+  fs.writeFileSync(launcherPath, sessionLauncher({ cwd: config.cwd, binaryPath, agentArgs, promptPath, unsetEnv: config.unsetEnv }), {
     mode: 0o700,
     flag: "wx",
   });
@@ -170,13 +192,22 @@ export type SessionLauncherTarget = {
   /** The agent's own options, which go before the prompt. */
   agentArgs: readonly string[];
   promptPath: string;
+  /** Variable names, unset before the agent starts. */
+  unsetEnv?: readonly string[];
 };
 
 /** Pure: the shell script that starts the agent on the prompt in `promptPath`. */
-export function sessionLauncher({ cwd, binaryPath, agentArgs, promptPath }: SessionLauncherTarget): string {
+export function sessionLauncher({
+  cwd,
+  binaryPath,
+  agentArgs,
+  promptPath,
+  unsetEnv = [],
+}: SessionLauncherTarget): string {
   const command = [binaryPath, ...agentArgs].map(shellQuote).join(" ");
   return [
     "#!/bin/sh",
+    ...(unsetEnv.length > 0 ? [`unset ${unsetEnv.map(shellQuote).join(" ")}`] : []),
     `cd ${shellQuote(cwd)} || exit 1`,
     `exec ${command} -- "$(cat ${shellQuote(promptPath)})"`,
     "",

@@ -273,7 +273,9 @@ switch (session.kind) {
 
 It writes the prompt to its own file (`0600`) and a launcher (`0700`) that passes it to the agent as one argument after `--`. Quotes, backticks and `$NAMES` in the prompt reach the agent as written, and the prompt can't set the agent's flags or run commands. Neither file is ever overwritten or deleted. On macOS the launcher opens in a new window of the user's terminal app (`open`, which needs no Automation permission).
 
-Expected failures come back as `kind: 'refused'`, with nothing written: Windows, which can't run the launcher (`unsupported_platform`); a prompt of 128 KiB or more on Linux, which caps a single argument at that size (`prompt_too_long`); and an agent that isn't on `PATH` when no `binaryPath` is given (`agent_not_found`). It throws only for an unknown `agent` or a `name` already used.
+Expected failures come back as `kind: 'refused'`, with nothing written: Windows, which can't run the launcher (`unsupported_platform`); a prompt of 128 KiB or more on Linux, which caps a single argument at that size (`prompt_too_long`); and an agent that isn't on `PATH` when no `binaryPath` is given (`agent_not_found`). It throws only for an unknown `agent`, an `unsetEnv` entry that isn't a shell variable name, or a `name` already used.
+
+On macOS, `open` passes its environment to a terminal app it launches, and every later window of that app inherits it. A server whose environment holds its own settings (ports, secrets, a data directory) passes `env` without them, so they don't reach the user's other terminal sessions, and `unsetEnv` with their names, so the launcher unsets them in a terminal that already holds them.
 
 `agentSessionMode(platform?)` says beforehand how a session would start, for showing the right button: `'terminal'` on macOS, `'command'` on other POSIX systems, `'none'` on Windows.
 
@@ -288,6 +290,8 @@ Expected failures come back as `kind: 'refused'`, with nothing written: Windows,
 | `dir` | `string` | Required | Where both files are written. Created if missing. |
 | `name` | `string` | `<UTC time>-<agent>-<4 hex digits>` | The files' name without extension. Neither file may exist yet. |
 | `platform` | `NodeJS.Platform` | `process.platform` | The platform the launcher is for. |
+| `env` | `NodeJS.ProcessEnv` | `process.env` | The environment `open` runs in on macOS, which a terminal app it launches keeps for every window. |
+| `unsetEnv` | `string[]` | None | Variables the launcher unsets before starting the agent. |
 
 ---
 

@@ -72,6 +72,22 @@ describe("sessionLauncher", () => {
     );
   });
 
+  it("unsets the given names before anything else", () => {
+    const script = sessionLauncher({
+      cwd: "/sample/project",
+      binaryPath: "/sample/bin/claude",
+      agentArgs: [],
+      promptPath: "/sample/project/sample.md",
+      unsetEnv: ["SAMPLE_PORT", "SAMPLE_SECRET"],
+    });
+
+    expect(script.split("\n").slice(0, 3)).toEqual([
+      "#!/bin/sh",
+      "unset 'SAMPLE_PORT' 'SAMPLE_SECRET'",
+      "cd '/sample/project' || exit 1",
+    ]);
+  });
+
   it("quotes paths with spaces and single quotes", () => {
     const script = sessionLauncher({
       cwd: "/sample/NOPII's project",
@@ -109,8 +125,8 @@ describe("startAgentSession", () => {
   /** Stands in for the next `open`, which succeeds or fails with `error`. */
   function stubOpen(error: Error | null = null) {
     execFileMock.mockClear();
-    execFileMock.mockImplementationOnce(((_file: string, _args: string[], callback: (error: Error | null) => void) => {
-      callback(error);
+    execFileMock.mockImplementationOnce(((...args: unknown[]) => {
+      (args.at(-1) as (error: Error | null) => void)(error);
     }) as unknown as typeof childProcess.execFile);
     return execFileMock;
   }
@@ -146,6 +162,24 @@ describe("startAgentSession", () => {
     expect(started.kind).toBe("opened");
     expect(open).toHaveBeenCalledTimes(1);
     expect(open.mock.calls[0].slice(0, 2)).toEqual(["open", [filesOf(started).launcherPath]]);
+  });
+
+  it("opens it in the caller's environment, or else the process's", async () => {
+    const env = { PATH: "/usr/bin:/bin", SAMPLE_SETTING: "kept" };
+    let open = stubOpen();
+    await startAgentSession({ ...config, env, platform: "darwin" });
+    expect(open.mock.calls[0][2]).toEqual({ env });
+
+    open = stubOpen();
+    await startAgentSession({ ...config, name: "sample-2", platform: "darwin" });
+    expect(open.mock.calls[0][2]).toEqual({ env: process.env });
+  });
+
+  it("refuses an unsetEnv entry that isn't a variable name, writing nothing", async () => {
+    for (const name of ["", "1SAMPLE", "SAMPLE NAME", "SAMPLE;rm", "$SAMPLE"]) {
+      await expect(startAgentSession({ ...config, unsetEnv: [name], platform: "linux" })).rejects.toThrow(TypeError);
+    }
+    expect(fs.readdirSync(dir)).toEqual([]);
   });
 
   it("says why the terminal window didn't open, with the files written", async () => {
@@ -240,5 +274,30 @@ describe("startAgentSession", () => {
     expect(lines.slice(0, 4)).toEqual(["--model", "gpt-5.6-sol", "--approve-for-me", "--"]);
     expect(workingDir).toBe(fs.realpathSync(cwd));
     expect(lines.slice(4).join("\n")).toBe(PROMPT);
+  });
+
+  it("runs the binary without the names it was told to unset", async () => {
+    const binaryPath = path.join(dir, "agent");
+    // A stand-in agent that reports which settings it can see.
+    fs.writeFileSync(binaryPath, '#!/bin/sh\nprintf "%s|%s" "${SAMPLE_PORT-unset}" "${SAMPLE_KEPT-unset}"\n', {
+      mode: 0o700,
+    });
+    const files = filesOf(
+      await startAgentSession({
+        agent: "claude-code",
+        binaryPath,
+        cwd: dir,
+        prompt: PROMPT,
+        dir: path.join(dir, "sessions"),
+        unsetEnv: ["SAMPLE_PORT", "SAMPLE_ABSENT"],
+        platform: "linux",
+      }),
+    );
+
+    const { stdout } = await run("/bin/sh", ["-c", files.command], {
+      env: { PATH: "/usr/bin:/bin", SAMPLE_PORT: "050505", SAMPLE_KEPT: "kept" },
+    });
+
+    expect(stdout).toBe("unset|kept");
   });
 });
