@@ -56,18 +56,21 @@ describe("runInvocation", () => {
       timeoutMs: 200,
       idleTimeoutMs: null,
     });
-    expect(result.stopped).toEqual({ limit: "total", limitMs: 200, afterMs: expect.any(Number) });
+    expect(result.stopped).toEqual({ by: "total", limitMs: 200, afterMs: expect.any(Number), lastOutputAtMs: null });
     expect(result.stopped!.afterMs).toBeGreaterThanOrEqual(200);
   });
 
   it("stops a process that prints nothing for the idle limit, but not one that keeps printing", async () => {
     const quiet = await runInvocation({
       binaryPath: node,
-      invocation: { args: ["-e", "setTimeout(() => {}, 60000)"], stdin: "" },
+      invocation: { args: ["-e", "console.log('started'); setTimeout(() => {}, 60000)"], stdin: "" },
       timeoutMs: 10_000,
       idleTimeoutMs: 200,
     });
-    expect(quiet.stopped).toMatchObject({ limit: "idle", limitMs: 200 });
+    expect(quiet.stopped).toMatchObject({ by: "idle", limitMs: 200 });
+    // It printed once, at the start, and was stopped the idle limit after that.
+    const { afterMs, lastOutputAtMs } = quiet.stopped!;
+    expect(afterMs - lastOutputAtMs!).toBeGreaterThanOrEqual(200);
 
     // Prints every 100 ms for 600 ms: longer than the idle limit in all, never quiet for it.
     const chatty = await runInvocation({
@@ -107,21 +110,36 @@ describe("runInvocation", () => {
     expect(last.at - first.at).toBeGreaterThanOrEqual(200);
   });
 
-  it("keeps running when the listener throws, and returns its first error", async () => {
-    let calls = 0;
+  it("stops the process when the signal aborts, and returns once it has exited", async () => {
+    const controller = new AbortController();
+    let pid: number | undefined;
     const result = await runInvocation({
       binaryPath: node,
-      invocation: { args: ["-e", "console.log('a'); setTimeout(() => console.log('b'), 50)"], stdin: "" },
+      // Ignores SIGINT, so only the SIGKILL after the grace period ends it.
+      invocation: { args: ["-e", "process.on('SIGINT', () => {}); console.log(process.pid); setInterval(() => {}, 1000)"], stdin: "" },
       timeoutMs: 10_000,
       idleTimeoutMs: null,
-      onOutput: () => {
-        throw new Error(`sample listener failure ${++calls}`);
+      signal: controller.signal,
+      onOutput: (chunk) => {
+        pid ??= Number(chunk.trim());
+        controller.abort();
       },
     });
-    expect(result.exitCode).toBe(0);
-    expect(result.stdout).toBe("a\nb\n");
-    expect(calls).toBe(2);
-    expect(result.listenerError).toEqual(new Error("sample listener failure 1"));
+    expect(result.stopped).toMatchObject({ by: "signal" });
+    expect(result.exitCode).toBeNull();
+    expect(() => process.kill(pid!, 0)).toThrow(expect.objectContaining({ code: "ESRCH" }));
+  });
+
+  it("stops the process at once when the signal has already aborted", async () => {
+    const result = await runInvocation({
+      binaryPath: node,
+      invocation: { args: ["-e", "setTimeout(() => console.log('ran'), 500)"], stdin: "" },
+      timeoutMs: 10_000,
+      idleTimeoutMs: null,
+      signal: AbortSignal.abort(),
+    });
+    expect(result.stopped).toMatchObject({ by: "signal", lastOutputAtMs: null });
+    expect(result.stdout).toBe("");
   });
 
   it("rejects when the binary does not exist", async () => {

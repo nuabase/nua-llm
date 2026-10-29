@@ -46,8 +46,9 @@ export type AttemptFailure = {
    * - transient: another attempt may succeed.
    * - fatal: every attempt will fail the same way (bad API key, not logged in, out of quota, timed out).
    * - schema-rejected: the engine refused the native schema; the in-prompt prompt may still work.
+   * - cancelled: the caller's signal aborted it.
    */
-  kind: "transient" | "fatal" | "schema-rejected";
+  kind: "transient" | "fatal" | "schema-rejected" | "cancelled";
   message: string;
 };
 
@@ -64,6 +65,13 @@ export type AttemptOutcome =
  */
 export type EngineOutputListener = (chunk: string, stream: "stdout" | "stderr") => void;
 
+/** What one cast's caller hands each of its attempts. */
+export type AttemptControls = {
+  onOutput?: EngineOutputListener;
+  /** Cancels the attempt: an agent process is stopped, an HTTP request aborted. */
+  signal?: AbortSignal;
+};
+
 /**
  * Answers prompts on one model: an LLM provider's HTTP API, or a coding-agent
  * CLI on this machine. Expected failures come back as outcomes, not exceptions.
@@ -71,5 +79,5 @@ export type EngineOutputListener = (chunk: string, stream: "stdout" | "stderr") 
 export interface LlmEngine {
   /** The envelope schema in the form this engine enforces natively, or null if it cannot. */
   nativeSchema(envelopeSchema: JsonSchema): JsonSchema | null;
-  attempt(request: AttemptRequest, onOutput?: EngineOutputListener): Promise<AttemptOutcome>;
+  attempt(request: AttemptRequest, controls?: AttemptControls): Promise<AttemptOutcome>;
 }

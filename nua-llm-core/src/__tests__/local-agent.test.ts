@@ -6,7 +6,7 @@ import { AgentAdapter, AgentCallOptions } from "../modules/engine/local-agent/ad
 import { localAgent } from "../modules/engine/local-agent/create-local-agent";
 import { LocalAgent } from "../modules/engine/local-agent/local-agent";
 import { Semaphore } from "../modules/engine/local-agent/semaphore";
-import { EngineOutputListener } from "../modules/engine/llm-engine";
+import { AttemptControls, AttemptOutcome } from "../modules/engine/llm-engine";
 import { ModelInput } from "../modules/model-info";
 
 const silentLogger: Logger = {
@@ -24,7 +24,11 @@ const silentLogger: Logger = {
 function stubAgent(
   adapter: AgentAdapter,
   defaultModel: string | undefined,
-  { concurrency = 1, script = "" }: { concurrency?: number; script?: string } = {},
+  {
+    concurrency = 1,
+    script = "",
+    logger = silentLogger,
+  }: { concurrency?: number; script?: string; logger?: Logger } = {},
 ) {
   const invoked: AgentCallOptions[] = [];
   const recordingAdapter: AgentAdapter = {
@@ -47,7 +51,7 @@ function stubAgent(
       binaryPath: process.execPath,
       unsetEnv: [],
       limiter: new Semaphore(concurrency),
-      logger: silentLogger,
+      logger,
     },
     { model: defaultModel, timeoutMs: 10_000 },
   );
@@ -55,14 +59,19 @@ function stubAgent(
   return { agent, invoked, invokedModels };
 }
 
-/** Routes `model` on `agent`, runs one attempt, and returns the origin it reports. */
-async function originOfAttempt(agent: LocalAgent, model: ModelInput | undefined, onOutput?: EngineOutputListener) {
+/** Routes `model` on `agent` and runs one attempt. */
+function attemptOn(agent: LocalAgent, model: ModelInput | undefined, controls?: AttemptControls): Promise<AttemptOutcome> {
   const route = agent.route(model);
   if (route.kind !== "routed") throw new Error(route.message);
-  const outcome = await route.engine.attempt(
+  return route.engine.attempt(
     { prompt: "p", reusablePrefix: "", maxTokens: 100, enforcement: { kind: "in-prompt" } },
-    onOutput,
+    controls,
   );
+}
+
+/** Runs one attempt, and returns the origin it reports. */
+async function originOfAttempt(agent: LocalAgent, model: ModelInput | undefined, controls?: AttemptControls) {
+  const outcome = await attemptOn(agent, model, controls);
   if (outcome.kind !== "answered") throw new Error(outcome.failure.message);
   return outcome.origin;
 }
@@ -148,24 +157,73 @@ describe("LocalAgent.with", () => {
     const first: string[] = [];
     const second: string[] = [];
     await Promise.all([
-      originOfAttempt(agent, undefined, (chunk) => first.push(chunk)),
-      originOfAttempt(agent, undefined, (chunk) => second.push(chunk)),
+      originOfAttempt(agent, undefined, { onOutput: (chunk) => first.push(chunk) }),
+      originOfAttempt(agent, undefined, { onOutput: (chunk) => second.push(chunk) }),
     ]);
     expect(first.join("")).toMatch(/^\d+\n$/);
     expect(second.join("")).toMatch(/^\d+\n$/);
     expect(first.join("")).not.toBe(second.join(""));
   });
 
-  it("says which limit stopped an agent and how to raise it", async () => {
+  it("says which limit stopped an agent, what it had printed, and how to raise the limit", async () => {
     const { agent } = stubAgent(claudeCodeAdapter, undefined, {
       script: "console.error('sample stderr'); setTimeout(() => {}, 60000)",
     });
     await expect(originOfAttempt(agent.with({ idleTimeoutMs: 200 }), undefined)).rejects.toThrow(
-      /printed nothing for 0\.2 s \(idleTimeoutMs 200\)\. Raise idleTimeoutMs, or set it to null for no limit\. Its stderr ended: sample stderr/,
+      /printed nothing for 0\.2 s \(idleTimeoutMs 200\)\. It had printed 14 characters before that\. Raise idleTimeoutMs, or set it to null for no limit\. Its stderr ended: sample stderr/,
     );
     await expect(
       originOfAttempt(agent.with({ timeoutMs: 200, idleTimeoutMs: null }), undefined),
-    ).rejects.toThrow(/its limit \(timeoutMs 200\)\. Raise timeoutMs\./);
+    ).rejects.toThrow(
+      /its limit \(timeoutMs 200\)\. It had printed 14 characters, the last 0\.\d s before it was stopped\. Raise timeoutMs\./,
+    );
+
+    const { agent: silent } = stubAgent(claudeCodeAdapter, undefined, { script: "setTimeout(() => {}, 60000)" });
+    await expect(
+      originOfAttempt(silent.with({ timeoutMs: 200, idleTimeoutMs: null }), undefined),
+    ).rejects.toThrow(/its limit \(timeoutMs 200\)\. It had printed nothing\. Raise timeoutMs\./);
+  });
+
+  it("logs a listener's first throw and runs the agent on", async () => {
+    const warnings: unknown[][] = [];
+    const logger = { ...silentLogger, warn: (...args: unknown[]) => void warnings.push(args) };
+    const { agent } = stubAgent(codexAdapter, undefined, {
+      script: "console.log('a'); setTimeout(() => console.log('b'), 50)",
+      logger,
+    });
+    let calls = 0;
+    const origin = await originOfAttempt(agent, undefined, {
+      onOutput: () => {
+        calls++;
+        throw new Error("sample listener failure");
+      },
+    });
+    expect(origin).toMatchObject({ agent: "codex" });
+    expect(calls).toBe(2);
+    expect(warnings).toEqual([
+      [expect.stringMatching(/onOutput listener threw/), expect.objectContaining({ error: "sample listener failure" })],
+    ]);
+  });
+
+  it("stops a running agent when the signal aborts", async () => {
+    const { agent } = stubAgent(codexAdapter, undefined, { script: "setTimeout(() => {}, 60000)" });
+    const started = Date.now();
+    const outcome = await attemptOn(agent, undefined, { signal: AbortSignal.timeout(100) });
+    expect(outcome).toEqual({ kind: "failed", failure: { kind: "cancelled", message: "The call was cancelled." } });
+    expect(Date.now() - started).toBeLessThan(5000);
+  });
+
+  it("drops a cancelled attempt from the queue without running it, and keeps the queue moving", async () => {
+    const { agent, invoked } = stubAgent(codexAdapter, undefined, { script: "setTimeout(() => {}, 400)" });
+    const controller = new AbortController();
+    const running = originOfAttempt(agent, undefined);
+    const queued = attemptOn(agent, undefined, { signal: controller.signal });
+    const next = originOfAttempt(agent, undefined);
+    controller.abort();
+    expect(await queued).toMatchObject({ kind: "failed", failure: { kind: "cancelled" } });
+    await Promise.all([running, next]);
+    // The cancelled attempt never built an invocation.
+    expect(invoked).toHaveLength(2);
   });
 
   it("rejects an empty model", () => {

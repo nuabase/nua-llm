@@ -111,6 +111,7 @@ if (address.success) console.log(address.data); // z.infer<typeof AddressSchema>
 * `output: { name: string; schema: ZodSchema }` – Identifier and Zod schema for the output.
 * `model?: ModelInput` – Override the client's default model for this call.
 * `onOutput?: (chunk, stream) => void` – On a local agent, gets everything the agent prints while this call runs, unparsed, as it arrives (`stream` is `'stdout'` or `'stderr'`), to show as a log. Chunks don't follow line boundaries, and a retry's output follows the earlier attempt's. Provider APIs print nothing, so it is never called.
+* `signal?: AbortSignal` – Cancels the call: a local agent's process is stopped (SIGINT, then SIGKILL 2 seconds later) and a provider request is aborted. A call waiting for a free agent process leaves the queue. The call then fails with `cancelled: true` and is not retried.
 
 ### `nua.list(prompt, options)`
 
@@ -135,6 +136,7 @@ if (result.success) {
 * `output: { name: string; schema: ZodSchema }` – Property name and Zod schema attached to each returned row.
 * `model?: ModelInput` – Override the client's default model for this call.
 * `onOutput?: (chunk, stream) => void` – As for `get()`.
+* `signal?: AbortSignal` – As for `get()`.
 
 ---
 
@@ -233,6 +235,10 @@ To show a call's progress, pass `onOutput` with the call. What the agent prints 
 const result = await nua.get(prompt, { output: { name: 'chart', schema }, onOutput: (chunk) => res.write(chunk) });
 ```
 
+> **Note:** This sends the agent's output to the browser unfiltered: its reasoning, the prompt and input data it echoes, and details of the machine it runs on, such as working directories and how it is logged in. That suits a local-first app, where the server, the agent and the browser are all on the user's own machine and the user is the only one watching. A server that others reach should filter the output, or show only progress such as a count of characters, before passing it on.
+
+When a call is stopped by `timeoutMs` or `idleTimeoutMs`, its error says which limit stopped it, how much the agent had printed and when it last printed, so a slow agent can be told from a stuck one. A call stopped by either limit is not retried, so `timeoutMs` bounds how long it runs. A transient failure is retried, and each attempt may take up to `timeoutMs`.
+
 > **Note:** Local agent calls count against your personal subscription limits. Check each vendor's terms before exposing local-agent execution to end users.
 
 ### Interactive Agent Sessions (Node.js only)
@@ -324,6 +330,7 @@ The call rejects (throws) only for invalid arguments, before anything is sent: a
 | `latencyMs` | `number` | Time elapsed until failure in milliseconds. |
 
 > **💡 Tip: Maximize Prompt Caching**
+| `cancelled` | `boolean` | `true` when the call's `signal` cancelled it. |
 > Keep your `prompt` string static across calls and pass dynamic values via `input`. Nuabase places the prompt and schema at the beginning of the payload so providers can cache that prefix. Cache reads are heavily discounted—whereas on providers like Claude, changing the prompt prefix on every call incurs a 25% cache-write premium without ever getting a cache hit.
 
 ---

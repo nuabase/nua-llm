@@ -15,6 +15,8 @@ export type CastValueParams = {
   input: { prompt: string; data?: unknown };
   output: { name: string; schema: z.ZodType };
   onOutput?: EngineOutputListener;
+  /** Cancels the cast; it then fails with `cancelled: true`. */
+  signal?: AbortSignal;
 };
 
 export type CastArrayParams = {
@@ -24,6 +26,8 @@ export type CastArrayParams = {
   /** Built with listSchema(); it names each row's primary key and output field. */
   output: ListSchema;
   onOutput?: EngineOutputListener;
+  /** Cancels the cast; it then fails with `cancelled: true`. */
+  signal?: AbortSignal;
 };
 
 const DEFAULT_MAX_TOKENS = 4096;
@@ -54,7 +58,10 @@ export class NuaLlmClient {
       jsonSchema,
       maxTokens: params.maxTokens ?? DEFAULT_MAX_TOKENS,
     };
-    return runCast<T>(route.engine, request, this.engines.logger, params.onOutput);
+    return runCast<T>(route.engine, request, this.engines.logger, {
+      onOutput: params.onOutput,
+      signal: params.signal,
+    });
   }
 
   async castArray<T = unknown>(params: CastArrayParams): Promise<CastResult<T[]>> {
@@ -80,7 +87,10 @@ export class NuaLlmClient {
       jsonSchema,
       maxTokens: params.maxTokens ?? DEFAULT_MAX_TOKENS,
     };
-    return runCast<T[]>(route.engine, request, this.engines.logger, params.onOutput);
+    return runCast<T[]>(route.engine, request, this.engines.logger, {
+      onOutput: params.onOutput,
+      signal: params.signal,
+    });
   }
 }
 

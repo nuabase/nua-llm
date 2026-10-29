@@ -1,6 +1,13 @@
 import { generateSpanId, logLlmCallError, Logger } from "../../../lib/logger";
 import { JsonSchema } from "../../../lib/schema-utils";
-import { AttemptFailure, AttemptOutcome, AttemptRequest, EngineOutputListener, LlmEngine } from "../llm-engine";
+import {
+  AttemptControls,
+  AttemptFailure,
+  AttemptOutcome,
+  AttemptRequest,
+  EngineOutputListener,
+  LlmEngine,
+} from "../llm-engine";
 import { stderrTail } from "./adapters/failure-classification";
 import { AgentAdapter, AgentCallOptions, AgentProcessResult, AgentProcessStop } from "./adapters/types";
 import { runInvocation } from "./process-runner";
@@ -39,11 +46,17 @@ export class LocalAgentEngine implements LlmEngine {
     return this.runner.adapter.nativeSchema(envelopeSchema);
   }
 
-  attempt(request: AttemptRequest, onOutput?: EngineOutputListener): Promise<AttemptOutcome> {
-    return this.runner.limiter.run(() => this.runAgent(request, onOutput));
+  async attempt(request: AttemptRequest, controls: AttemptControls = {}): Promise<AttemptOutcome> {
+    try {
+      return await this.runner.limiter.run(() => this.runAgent(request, controls), controls.signal);
+    } catch (error) {
+      // Cancelled while waiting for a free process; runAgent itself never throws.
+      if (controls.signal?.aborted) return CANCELLED;
+      throw error;
+    }
   }
 
-  private async runAgent(request: AttemptRequest, onOutput?: EngineOutputListener): Promise<AttemptOutcome> {
+  private async runAgent(request: AttemptRequest, { onOutput, signal }: AttemptControls): Promise<AttemptOutcome> {
     const { adapter, binaryPath, logger, unsetEnv } = this.runner;
     const { model, effort, timeoutMs, idleTimeoutMs } = this.call;
     const spanId = generateSpanId();
@@ -72,21 +85,18 @@ export class LocalAgentEngine implements LlmEngine {
         invocation: adapter.buildInvocation(request, { model, effort }),
         timeoutMs,
         idleTimeoutMs,
-        onOutput,
+        onOutput: onOutput && guardListener(onOutput, logger, spanId),
+        signal,
         unsetEnv,
       });
     } catch (error) {
       return failed({ kind: "fatal", message: error instanceof Error ? error.message : String(error) });
     }
 
-    const { listenerError } = result;
-    if (listenerError !== undefined) {
-      logger.warn("The onOutput listener threw; the agent ran on", {
-        span_id: spanId,
-        error: listenerError instanceof Error ? listenerError.message : String(listenerError),
-      });
+    if (result.stopped?.by === "signal") {
+      logger.info("LLM call cancelled", { span_id: spanId, duration_ms: Date.now() - startTime });
+      return CANCELLED;
     }
-
     if (result.stopped) {
       return failed({ kind: "fatal", message: stopMessage(result.stopped, result) });
     }
@@ -120,14 +130,54 @@ export class LocalAgentEngine implements LlmEngine {
   }
 }
 
-/** Says which limit stopped the agent, how to raise it, and what the agent said on stderr. */
-function stopMessage(stopped: AgentProcessStop, result: AgentProcessResult): string {
+const CANCELLED: AttemptOutcome = {
+  kind: "failed",
+  failure: { kind: "cancelled", message: "The call was cancelled." },
+};
+
+/**
+ * The listener, made safe to call from the process's output handlers, where a
+ * throw would crash the host process. It keeps getting output after it throws;
+ * the first error is logged.
+ */
+function guardListener(onOutput: EngineOutputListener, logger: Logger, spanId: string): EngineOutputListener {
+  let failed = false;
+  return (chunk, stream) => {
+    try {
+      onOutput(chunk, stream);
+    } catch (error) {
+      if (failed) return;
+      failed = true;
+      logger.warn("The onOutput listener threw; the agent runs on", {
+        span_id: spanId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+}
+
+/**
+ * Says which limit stopped the agent, how much it had printed and when it last
+ * did, which tells a slow agent from a stuck one, how to raise the limit, and
+ * what the agent said on stderr.
+ */
+function stopMessage(stopped: AgentProcessStop & { by: "total" | "idle" }, result: AgentProcessResult): string {
   const ran = `was stopped after ${seconds(stopped.afterMs)}`;
-  const reason =
-    stopped.limit === "idle"
-      ? `${ran}: it printed nothing for ${seconds(stopped.limitMs)} (idleTimeoutMs ${stopped.limitMs}). ` +
-        "Raise idleTimeoutMs, or set it to null for no limit."
-      : `${ran}, its limit (timeoutMs ${stopped.limitMs}). Raise timeoutMs.`;
+  const chars = result.stdout.length + result.stderr.length;
+  let reason: string;
+  if (stopped.by === "idle") {
+    const before =
+      stopped.lastOutputAtMs === null ? "It had printed nothing." : `It had printed ${chars} characters before that.`;
+    reason =
+      `${ran}: it printed nothing for ${seconds(stopped.limitMs)} (idleTimeoutMs ${stopped.limitMs}). ${before} ` +
+      "Raise idleTimeoutMs, or set it to null for no limit.";
+  } else {
+    const before =
+      stopped.lastOutputAtMs === null
+        ? "It had printed nothing."
+        : `It had printed ${chars} characters, the last ${seconds(stopped.afterMs - stopped.lastOutputAtMs)} before it was stopped.`;
+    reason = `${ran}, its limit (timeoutMs ${stopped.limitMs}). ${before} Raise timeoutMs.`;
+  }
   const stderr = stderrTail(result, 500);
   return stderr ? `${reason} Its stderr ended: ${stderr}` : reason;
 }

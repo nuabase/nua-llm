@@ -18,19 +18,24 @@ export type AgentProcessResult = {
   exitCode: number | null;
   stdout: string;
   stderr: string;
-  /** The limit that stopped the process; null when none did. */
+  /** Why the process was stopped before it finished; null when it wasn't. */
   stopped: AgentProcessStop | null;
   /** Contents of the requested output files; undefined when a file was not written. */
   outputFiles: Record<string, string | undefined>;
-  /** The first error the output listener threw. The process ran on regardless. */
-  listenerError?: unknown;
 };
 
 /**
- * Which limit stopped a process: the whole run's ("total") or the one on going
- * quiet ("idle"), how long that limit was, and how long after starting it fired.
+ * What stopped a process: the limit on the whole run ("total") or on going
+ * quiet ("idle"), which was `limitMs`, or the caller's AbortSignal ("signal").
  */
-export type AgentProcessStop = { limit: "total" | "idle"; limitMs: number; afterMs: number };
+export type AgentProcessStopCause = { by: "total" | "idle"; limitMs: number } | { by: "signal" };
+
+/** What stopped a process, and when, in milliseconds from its start. */
+export type AgentProcessStop = AgentProcessStopCause & {
+  afterMs: number;
+  /** When it last printed; null when it printed nothing. */
+  lastOutputAtMs: number | null;
+};
 
 /** What an agent's output says about one attempt. */
 export type AgentReply =

@@ -1,7 +1,7 @@
 import { Logger } from "../../../lib/logger";
 import { JsonSchema } from "../../../lib/schema-utils";
 import { toStrictSchema } from "../../../lib/strict-json-schema";
-import { Answer, AttemptFailure, AttemptOutcome, AttemptRequest, LlmEngine } from "../llm-engine";
+import { Answer, AttemptControls, AttemptFailure, AttemptOutcome, AttemptRequest, LlmEngine } from "../llm-engine";
 import { callProvider, ProviderTarget } from "./provider-call";
 import { providerConfigs } from "./provider-config";
 
@@ -23,7 +23,7 @@ export class HttpEngine implements LlmEngine {
     return toStrictSchema(envelopeSchema);
   }
 
-  async attempt(request: AttemptRequest): Promise<AttemptOutcome> {
+  async attempt(request: AttemptRequest, { signal }: AttemptControls = {}): Promise<AttemptOutcome> {
     const { provider, model, apiKey } = this.target;
     const config = providerConfigs[provider];
     const responseSchema = request.enforcement.kind === "native" ? request.enforcement.schema : undefined;
@@ -46,11 +46,15 @@ export class HttpEngine implements LlmEngine {
         parseResponse: config.parseResponse,
         responseLength: (reply) => reply.text.length,
         usage: (reply) => reply.usage,
+        signal,
       },
       this.logger,
     );
 
     if (call.kind === "failed") {
+      if (signal?.aborted) {
+        return { kind: "failed", failure: { kind: "cancelled", message: "The call was cancelled." } };
+      }
       return { kind: "failed", failure: failureForStatus(call.status, call.message, responseSchema !== undefined) };
     }
 

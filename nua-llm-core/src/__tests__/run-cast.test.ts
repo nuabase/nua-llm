@@ -289,9 +289,48 @@ describe("runCast", () => {
       error: "not logged in",
       reason: "not logged in",
       attempts: 1,
+      cancelled: false,
       prompt: inPromptPrompt,
     });
     expect(engine.requests).toHaveLength(1);
+  });
+
+  it("gives up without retrying when an attempt is cancelled", async () => {
+    const engine = scriptedEngine([failed("cancelled", "The call was cancelled.")]);
+    const result = await cast(engine);
+    expect(result).toEqual({
+      success: false,
+      error: "The call was cancelled.",
+      reason: "The call was cancelled.",
+      attempts: 1,
+      cancelled: true,
+      prompt: inPromptPrompt,
+    });
+    expect(engine.requests).toHaveLength(1);
+  });
+
+  it("stops waiting to retry when the signal aborts, and makes no further attempt", async () => {
+    const engine = scriptedEngine([failed("transient", "overloaded")]);
+    const controller = new AbortController();
+    const pending = runCast<number>(engine, request, silentLogger, { signal: controller.signal });
+    await jest.advanceTimersByTimeAsync(10);
+    controller.abort();
+    const result = await pending;
+    expect(result).toMatchObject({ success: false, attempts: 1, cancelled: true, prompt: inPromptPrompt });
+    expect(engine.requests).toHaveLength(1);
+  });
+
+  it("makes no attempt when the signal has already aborted", async () => {
+    const engine = scriptedEngine([]);
+    const result = await runCast<number>(engine, request, silentLogger, { signal: AbortSignal.abort() });
+    expect(result).toEqual({
+      success: false,
+      error: "The call was cancelled.",
+      reason: "The call was cancelled.",
+      attempts: 0,
+      cancelled: true,
+      prompt: undefined,
+    });
   });
 
   it("retries transient failures and invalid answers, then reports the last error", async () => {

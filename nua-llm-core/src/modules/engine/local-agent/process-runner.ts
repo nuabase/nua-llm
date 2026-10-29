@@ -4,7 +4,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 
 import { EngineOutputListener } from "../llm-engine";
-import { AgentInvocation, AgentProcessResult, AgentProcessStop } from "./adapters/types";
+import { AgentInvocation, AgentProcessResult, AgentProcessStop, AgentProcessStopCause } from "./adapters/types";
 
 // Grace period between SIGINT and SIGKILL. Claude Code only prints its result
 // on SIGINT; SIGTERM makes it exit without output.
@@ -16,8 +16,10 @@ export type RunInvocationOptions = {
   timeoutMs: number;
   /** Stops the process when it prints nothing for this long. Null for no limit. */
   idleTimeoutMs: number | null;
-  /** Gets the process's output as it arrives, as well as the result. */
+  /** Gets the process's output as it arrives, as well as the result. Must not throw. */
   onOutput?: EngineOutputListener;
+  /** Stops the process: SIGINT, then SIGKILL after a grace period. */
+  signal?: AbortSignal;
   /** Env var names removed from the child's environment. */
   unsetEnv?: string[];
 };
@@ -67,15 +69,14 @@ function spawnAndCollect(options: RunInvocationOptions, cwd: string): Promise<Ag
     const stdout: string[] = [];
     const stderr: string[] = [];
     let stopped: AgentProcessStop | null = null;
-    let listenerError: unknown;
+    let lastOutputAtMs: number | null = null;
     let killTimer: ReturnType<typeof setTimeout> | undefined;
     let idleTimer: ReturnType<typeof setTimeout> | undefined;
 
-    const stop = (limit: AgentProcessStop["limit"], limitMs: number) => {
+    const stop = (cause: AgentProcessStopCause) => {
       if (stopped) return;
-      stopped = { limit, limitMs, afterMs: Date.now() - startedAt };
-      clearTimeout(timeoutTimer);
-      clearTimeout(idleTimer);
+      stopped = { ...cause, afterMs: Date.now() - startedAt, lastOutputAtMs };
+      clearTimers();
       child.kill("SIGINT");
       killTimer = setTimeout(() => child.kill("SIGKILL"), KILL_GRACE_MS);
     };
@@ -83,37 +84,38 @@ function spawnAndCollect(options: RunInvocationOptions, cwd: string): Promise<Ag
       const idleTimeoutMs = options.idleTimeoutMs;
       if (idleTimeoutMs === null || stopped) return;
       clearTimeout(idleTimer);
-      idleTimer = setTimeout(() => stop("idle", idleTimeoutMs), idleTimeoutMs);
+      idleTimer = setTimeout(() => stop({ by: "idle", limitMs: idleTimeoutMs }), idleTimeoutMs);
     };
-    const timeoutTimer = setTimeout(() => stop("total", options.timeoutMs), options.timeoutMs);
+    const timeoutTimer = setTimeout(() => stop({ by: "total", limitMs: options.timeoutMs }), options.timeoutMs);
     resetIdleTimer();
+    const onAbort = () => stop({ by: "signal" });
+    const clearTimers = () => {
+      clearTimeout(timeoutTimer);
+      clearTimeout(idleTimer);
+      options.signal?.removeEventListener("abort", onAbort);
+    };
+    options.signal?.addEventListener("abort", onAbort, { once: true });
+    if (options.signal?.aborted) onAbort();
 
     const collect = (stream: "stdout" | "stderr", chunks: string[]) => (chunk: string) => {
       chunks.push(chunk);
+      lastOutputAtMs = Date.now() - startedAt;
       resetIdleTimer();
-      try {
-        options.onOutput?.(chunk, stream);
-      } catch (error) {
-        // A throw here would crash the host process. The listener keeps getting
-        // output, and the caller learns of its first failure from the result.
-        listenerError ??= error;
-      }
+      options.onOutput?.(chunk, stream);
     };
     // Decoding here keeps a character split across two chunks whole.
     child.stdout.setEncoding("utf8").on("data", collect("stdout", stdout));
     child.stderr.setEncoding("utf8").on("data", collect("stderr", stderr));
 
     child.on("error", (error: NodeJS.ErrnoException) => {
-      clearTimeout(timeoutTimer);
-      clearTimeout(idleTimer);
+      clearTimers();
       clearTimeout(killTimer);
       const reason = error.code === "ENOENT" ? "not found" : error.message;
       reject(new Error(`Could not start ${options.binaryPath}: ${reason}`));
     });
 
     child.on("close", (exitCode: number | null) => {
-      clearTimeout(timeoutTimer);
-      clearTimeout(idleTimer);
+      clearTimers();
       clearTimeout(killTimer);
       resolve({
         exitCode,
@@ -121,7 +123,6 @@ function spawnAndCollect(options: RunInvocationOptions, cwd: string): Promise<Ag
         stderr: stderr.join(""),
         stopped,
         outputFiles: {},
-        listenerError,
       });
     });
 

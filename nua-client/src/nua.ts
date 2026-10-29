@@ -39,6 +39,8 @@ export type GetOptions<TSchema extends z.ZodTypeAny> = {
   model?: ModelInput;
   /** Gets what a local agent prints while this call runs. */
   onOutput?: EngineOutputListener;
+  /** Cancels this call; it then fails with `cancelled: true`. */
+  signal?: AbortSignal;
 };
 
 export type ListOptions<
@@ -53,6 +55,8 @@ export type ListOptions<
   model?: ModelInput;
   /** Gets what a local agent prints while this call runs. */
   onOutput?: EngineOutputListener;
+  /** Cancels this call; it then fails with `cancelled: true`. */
+  signal?: AbortSignal;
 };
 
 // Result row for list operations: primaryKey + output field
@@ -110,6 +114,7 @@ export class Nua {
       input: { prompt, data: options?.input ?? null },
       output: { name: outputName, schema: outputSchema },
       onOutput: options?.onOutput,
+      signal: options?.signal,
     });
     return toDirectResult(result, Date.now() - startTime);
   }
@@ -148,6 +153,7 @@ export class Nua {
       input: { prompt, data: options.input },
       output,
       onOutput: options.onOutput,
+      signal: options.signal,
     });
     return toDirectResult(result, Date.now() - startTime);
   }
@@ -162,8 +168,8 @@ function enginesFor(config: DirectConfig): EngineRouter {
 
 function toDirectResult<T>(result: CoreCastResult<T>, latencyMs: number): CastResult<T> {
   if (!result.success) {
-    const { error, reason, attempts } = result;
-    return { success: false, error, reason, attempts, source: 'direct', latencyMs };
+    const { error, reason, attempts, cancelled } = result;
+    return { success: false, error, reason, attempts, cancelled, source: 'direct', latencyMs };
   }
   return {
     success: true,

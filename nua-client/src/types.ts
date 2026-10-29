@@ -32,6 +32,8 @@ type CastResultFailure = {
   reason: string;
   /** Attempts made; 0 when the request was refused before any (such as an invalid schema). */
   attempts: number;
+  /** True when the call's `signal` cancelled it. A cancelled call is not retried. */
+  cancelled: boolean;
   source: CastResultSource;
   latencyMs: number;
 };

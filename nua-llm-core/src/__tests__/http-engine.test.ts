@@ -120,6 +120,19 @@ describe("HttpEngine with strict structured outputs", () => {
       failure: { kind: "schema-rejected" },
     });
   });
+
+  it("aborts the request when the signal aborts, and reports the attempt as cancelled", async () => {
+    // Rejects as fetch does once the request's signal aborts.
+    global.fetch = jest.fn((_url: string, init: RequestInit) => {
+      return new Promise((_resolve, reject) => {
+        init.signal!.addEventListener("abort", () => reject(init.signal!.reason));
+      });
+    }) as unknown as typeof fetch;
+    const controller = new AbortController();
+    const pending = engine.attempt(request, { signal: controller.signal });
+    controller.abort();
+    expect(await pending).toEqual({ kind: "failed", failure: { kind: "cancelled", message: "The call was cancelled." } });
+  });
 });
 
 describe("sendAgentTurn", () => {

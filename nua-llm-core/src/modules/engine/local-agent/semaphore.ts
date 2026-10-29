@@ -5,9 +5,11 @@ export class Semaphore {
 
   constructor(private readonly limit: number) {}
 
-  async run<T>(task: () => Promise<T>): Promise<T> {
+  /** Rejects with the signal's reason, without running `task`, when `signal` aborts while it waits. */
+  async run<T>(task: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+    signal?.throwIfAborted();
     if (this.active >= this.limit) {
-      await new Promise<void>((resolve) => this.waiting.push(resolve));
+      await this.waitForTurn(signal);
     } else {
       this.active++;
     }
@@ -21,5 +23,21 @@ export class Semaphore {
         this.active--;
       }
     }
+  }
+
+  /** Resolves once a finishing task hands over its place. */
+  private waitForTurn(signal: AbortSignal | undefined): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const take = () => {
+        signal?.removeEventListener("abort", leave);
+        resolve();
+      };
+      const leave = () => {
+        this.waiting.splice(this.waiting.indexOf(take), 1);
+        reject(signal!.reason);
+      };
+      this.waiting.push(take);
+      signal?.addEventListener("abort", leave, { once: true });
+    });
   }
 }

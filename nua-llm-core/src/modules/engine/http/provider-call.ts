@@ -31,6 +31,8 @@ export type ProviderCall<T> = {
   /** Characters of reply text, for the log. */
   responseLength: (reply: T) => number;
   usage: (reply: T) => NormalizedUsage | undefined;
+  /** Aborts the request. */
+  signal?: AbortSignal;
 };
 
 export type ProviderCallResult<T> =
@@ -61,6 +63,7 @@ export async function callProvider<T>(
       method,
       headers: request.headers ?? {},
       body: toFetchableBody(request.body),
+      signal: call.signal,
     });
     status = response.status;
 

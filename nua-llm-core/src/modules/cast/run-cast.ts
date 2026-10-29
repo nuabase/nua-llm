@@ -6,8 +6,8 @@ import {
   Answer,
   AnswerOrigin,
   AttemptFailure,
+  AttemptControls,
   AttemptOutcome,
-  EngineOutputListener,
   LlmEngine,
   SchemaEnforcement,
   SchemaEnforcementKind,
@@ -43,6 +43,8 @@ export type CastFailure = {
   reason: string;
   /** Attempts made; 0 when the request was refused before any. */
   attempts: number;
+  /** True when the caller's signal cancelled the cast. It is never retried. */
+  cancelled: boolean;
   /** The prompt of the last attempt, when one was made. */
   prompt?: RenderedPrompt;
 };
@@ -51,7 +53,7 @@ export type CastResult<T> = CastSuccess<T> | CastFailure;
 
 /** A cast refused before any attempt, such as for an invalid request. */
 export function refusedCast(reason: string): CastFailure {
-  return { success: false, error: reason, reason, attempts: 0 };
+  return { success: false, error: reason, reason, attempts: 0, cancelled: false };
 }
 
 /** Wait before each retry. There is one more attempt than there are delays. */
@@ -72,13 +74,16 @@ export async function runCast<T>(
   engine: LlmEngine,
   request: CastRequest,
   logger: Logger,
-  onOutput?: EngineOutputListener,
+  controls: AttemptControls = {},
 ): Promise<CastResult<T>> {
   const validate = validatorFor(request.schema);
   let plan = planAttempt(request, chooseEnforcement(engine, request.jsonSchema));
   let lastFailure = { error: "", prompt: plan.prompt };
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    if (controls.signal?.aborted) {
+      return cancelledCast(attempt - 1, attempt > 1 ? lastFailure.prompt : undefined);
+    }
     const outcome = await engine.attempt(
       {
         prompt: plan.prompt.full,
@@ -86,7 +91,7 @@ export async function runCast<T>(
         maxTokens: request.maxTokens,
         enforcement: plan.enforcement,
       },
-      onOutput,
+      controls,
     );
     const verdict = judgeOutcome(outcome, validate);
 
@@ -101,7 +106,17 @@ export async function runCast<T>(
       };
     }
     if (verdict.kind === "give-up") {
-      return { success: false, error: verdict.error, reason: verdict.error, attempts: attempt, prompt: plan.prompt };
+      return {
+        success: false,
+        error: verdict.error,
+        reason: verdict.error,
+        attempts: attempt,
+        cancelled: false,
+        prompt: plan.prompt,
+      };
+    }
+    if (verdict.kind === "cancelled") {
+      return cancelledCast(attempt, plan.prompt);
     }
 
     lastFailure = { error: verdict.error, prompt: plan.prompt };
@@ -117,7 +132,7 @@ export async function runCast<T>(
     if (attempt < MAX_ATTEMPTS) {
       const delayMs = RETRY_DELAYS_MS[attempt - 1];
       logger.warn("LLM call attempt failed; retrying", { attempt, delayMs, error: verdict.error });
-      await delay(delayMs);
+      await delay(delayMs, controls.signal);
     }
   }
 
@@ -126,6 +141,7 @@ export async function runCast<T>(
     error: `LLM call failed after ${MAX_ATTEMPTS} attempts. Last error: ${lastFailure.error}`,
     reason: lastFailure.error,
     attempts: MAX_ATTEMPTS,
+    cancelled: false,
     prompt: lastFailure.prompt,
   };
 }
@@ -155,7 +171,8 @@ export type Verdict =
   | { kind: "accept"; data: unknown; usage: NormalizedUsage; origin: AnswerOrigin }
   | { kind: "retry"; error: string }
   | { kind: "retry-in-prompt"; error: string }
-  | { kind: "give-up"; error: string };
+  | { kind: "give-up"; error: string }
+  | { kind: "cancelled" };
 
 /** Decides what one attempt means for the cast. */
 export function judgeOutcome(
@@ -190,6 +207,8 @@ function verdictForFailure(failure: AttemptFailure): Verdict {
       return { kind: "retry-in-prompt", error: failure.message };
     case "fatal":
       return { kind: "give-up", error: failure.message };
+    case "cancelled":
+      return { kind: "cancelled" };
   }
 }
 
@@ -229,6 +248,20 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function cancelledCast(attempts: number, prompt: RenderedPrompt | undefined): CastFailure {
+  const reason = "The call was cancelled.";
+  return { success: false, error: reason, reason, attempts, cancelled: true, prompt };
+}
+
+/** Waits `ms`, or less when `signal` aborts. */
+function delay(ms: number, signal: AbortSignal | undefined): Promise<void> {
+  return new Promise((resolve) => {
+    const done = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", done);
+      resolve();
+    };
+    const timer = setTimeout(done, ms);
+    signal?.addEventListener("abort", done, { once: true });
+  });
 }

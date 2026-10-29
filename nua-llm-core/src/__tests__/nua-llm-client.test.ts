@@ -120,6 +120,7 @@ describe("NuaLlmClient", () => {
       error: "no codex equivalent",
       reason: "no codex equivalent",
       attempts: 0,
+      cancelled: false,
     });
   });
 });
