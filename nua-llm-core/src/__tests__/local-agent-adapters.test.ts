@@ -183,6 +183,13 @@ describe("codexAdapter", () => {
     expect(invocation.outputFiles).toEqual([invocation.args[invocation.args.indexOf("-o") + 1]]);
   });
 
+  it("turns off the tools that reach past the prompt", () => {
+    const { args } = codexAdapter.buildInvocation(nativeRequest, {});
+    const disabled = args.flatMap((arg, i) => (arg === "--disable" ? [args[i + 1]] : []));
+    expect(disabled).toEqual(expect.arrayContaining(["shell_tool", "unified_exec", "apps", "view_image"]));
+    expect(args.join(" ")).toContain("-c web_search=disabled");
+  });
+
   it("only accepts schemas it can express in strict mode", () => {
     expect(codexAdapter.nativeSchema(ENVELOPE_SCHEMA)).toEqual(ENVELOPE_SCHEMA);
     const optionalField = {
@@ -408,6 +415,6 @@ describe("effort", () => {
   ] as const)("passes %s its own effort setting, and none when not given", (_name, adapter, expected) => {
     const args = adapter.buildInvocation(inPromptRequest, { effort: "low" }).args;
     expect(args.join(" ")).toContain(expected.join(" "));
-    expect(adapter.buildInvocation(inPromptRequest, {}).args).not.toContain(expected[0]);
+    expect(adapter.buildInvocation(inPromptRequest, {}).args).not.toContain(expected[1]);
   });
 });

@@ -5,6 +5,8 @@ import { AgentAdapter, AgentProcessResult, AgentReply } from "./types";
 
 const SCHEMA_FILE = "output-schema.json";
 const LAST_MESSAGE_FILE = "last-message.txt";
+/** Codex features a headless call turns off; see buildInvocation. */
+const DISABLED_FEATURES = ["shell_tool", "unified_exec", "apps", "plugins", "view_image"];
 
 type CodexEvent = {
   type?: string;
@@ -30,8 +32,13 @@ export const codexAdapter: AgentAdapter = {
   },
 
   buildInvocation(request: AttemptRequest, { model, effort }) {
-    // Codex has no flag to remove its tools. The empty working directory and
-    // the read-only sandbox keep it from touching anything.
+    // Codex has no flag to remove all its tools, so the ones that reach past
+    // the prompt are turned off: the shell, which in the read-only sandbox
+    // still reads the whole disk and the environment; the ChatGPT apps
+    // connector, which browses the web and changes the account; and image
+    // viewing and web search. What remains runs no command and, in the
+    // read-only sandbox, writes nothing. An unknown feature name fails the
+    // run, so each name here must be one Codex has had.
     const args = [
       "exec",
       "-",
@@ -41,6 +48,9 @@ export const codexAdapter: AgentAdapter = {
       "--ignore-rules",
       "--sandbox",
       "read-only",
+      ...DISABLED_FEATURES.flatMap((feature) => ["--disable", feature]),
+      "-c",
+      "web_search=disabled",
       "--json",
       "-o",
       LAST_MESSAGE_FILE,
