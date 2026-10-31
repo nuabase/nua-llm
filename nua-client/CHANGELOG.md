@@ -1,5 +1,26 @@
 # nuabase
 
+## 3.1.0
+
+### Minor Changes
+
+- 8fdf585: `startAgentSession()` takes `env`, the environment `open` runs in on macOS, and `unsetEnv`, names the launcher unsets before starting the agent. A terminal app that `open` launches keeps `open`'s environment for every later window, so before this a server's own settings reached the user's other terminal sessions. It throws a `TypeError` for an `unsetEnv` entry that isn't a shell variable name.
+- 3700318: `nua.get()` and `nua.list()` take `signal`, an `AbortSignal` that cancels the call. A local agent's process is stopped, SIGINT then SIGKILL 2 seconds later, and the call returns once the process has exited. A call still waiting for a free agent process leaves the queue without starting one. A provider request is aborted. A cancelled call is not retried and fails with `cancelled: true`, a new field of every failed result.
+  
+  A local agent stopped by `timeoutMs` or `idleTimeoutMs` now also says how much it had printed and, for `timeoutMs`, how long before the stop it last printed, which tells a slow agent from a stuck one.
+- a7054ac: Local agents: `onOutput`, an option of `nua.get()` and `nua.list()`, passes on everything the agent prints while that call runs, unparsed, so an app can show its progress as a log. `idleTimeoutMs` stops an agent that prints nothing for 2 minutes (Claude Code and Pi; Codex has no idle limit, since it is quiet while it reasons), and `timeoutMs` now defaults to 10 minutes instead of 3. A timeout says which limit was hit, after how long, how to raise it, and the end of the agent's stderr. Claude Code now runs with `--output-format stream-json`, so it prints while it works; only its final result line is read.
+  
+  Also changed:
+  
+  - `timeoutMs` and `idleTimeoutMs` must be from 1 to 2147483647 ms (or `null` for no idle limit); `localAgent()`, `findLocalAgent()` and `with()` throw a `TypeError` otherwise. Before, a value such as `0`, `NaN` or `Infinity` stopped the agent at once.
+  - In `agent.with()`, a `timeoutMs` given as `undefined` now resets to the default, as every other option does, instead of keeping the agent's.
+  - `findLocalAgent()` reports an invalid option only once it has found an agent, not before it looks.
+- 36ce67b: Add `localAgentSetupGuide()` to `nuabase/local-agent`: plain text an app shows a user with no coding agent set up, saying the agent must be the CLI, how to install and sign in to each supported one, and a prompt that has a desktop or browser agent install one.
+
+### Patch Changes
+
+- de8f585: A headless Codex call turns off Codex's shell, its ChatGPT apps connector, plugins, image viewing and web search. In the read-only sandbox the shell could still read any file and the caller's environment, and the apps connector could browse the web and change the account, so a prompt carrying an injected instruction could reach them. Codex 0.154 accepts these feature names; an older Codex that lacks one fails the call with "Unknown feature flag".
+
 ## 3.0.1
 
 ### Patch Changes
